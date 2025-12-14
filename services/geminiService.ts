@@ -18,16 +18,20 @@ const handleGenAIError = (error: any, context: string): never => {
     // Check for common API errors
     if (msg.includes('api key') || msg.includes('403')) {
       message = "Authentication failed. Please check your API Key configuration.";
-    } else if (msg.includes('quota') || msg.includes('429')) {
-      message = "Usage limit exceeded. The AI model is busy, please wait a moment.";
-    } else if (msg.includes('safety') || msg.includes('blocked')) {
-      message = "Safety filters triggered. Please refine your request to be more specific to trading.";
+    } else if (msg.includes('quota') || msg.includes('429') || msg.includes('resource exhausted')) {
+      message = "Usage limit exceeded (Quota). The AI model is busy, please wait a moment.";
+    } else if (msg.includes('safety') || msg.includes('blocked') || msg.includes('finishreason')) {
+      message = "The request was blocked by safety filters. Please ensure your inputs are strictly related to financial trading.";
     } else if (msg.includes('model not found') || msg.includes('404')) {
-      message = "The selected AI model is currently unavailable.";
+      message = "The selected AI model is currently unavailable or deprecated.";
     } else if (msg.includes('timeout')) {
         message = "The request timed out. Please try again with a simpler configuration.";
-    } else if (msg.includes('candidate')) {
-        message = "The AI could not generate a valid response. Please try refining your inputs.";
+    } else if (msg.includes('candidate') || msg.includes('malformed') || msg.includes('unexpected token')) {
+        message = "The AI generated a response that could not be processed. Please try again.";
+    } else if (msg.includes('503') || msg.includes('service unavailable')) {
+        message = "The AI service is temporarily unavailable. Please try again later.";
+    } else if (msg.includes('500') || msg.includes('internal error')) {
+        message = "Google AI encountered an internal server error. Please retry.";
     } else {
         // Pass through specific error messages we might have thrown manually
         message = error.message;
@@ -252,9 +256,14 @@ export const analyzeChart = async (imageBase64: string): Promise<Partial<Strateg
     });
     
     if (response.text) {
-        return JSON.parse(response.text) as Partial<StrategyConfig>;
+        try {
+            return JSON.parse(response.text) as Partial<StrategyConfig>;
+        } catch (e) {
+            console.error("JSON Parse Error during analysis:", e);
+            throw new Error("The AI analyzed the chart but failed to format the response correctly. Please try again or use a clearer image.");
+        }
     }
-    throw new Error("No analysis generated from the image.");
+    throw new Error("No analysis generated from the image. The model returned empty content.");
 
   } catch (error) {
     handleGenAIError(error, "Chart Analysis");
@@ -319,10 +328,16 @@ export const generateTradingBot = async (config: StrategyConfig): Promise<Genera
       },
     });
 
-    const result = JSON.parse(response.text || "{}");
+    let result;
+    try {
+        result = JSON.parse(response.text || "{}");
+    } catch (e) {
+        console.error("JSON Parse Error during bot generation:", e);
+        throw new Error("The AI generated the strategy but failed to structure the code output. Please try again.");
+    }
     
     if (!result.code) {
-      throw new Error("Failed to generate valid code structure.");
+      throw new Error("The AI response was incomplete (missing code). Please try regenerating.");
     }
 
     return result as GeneratedBot;
