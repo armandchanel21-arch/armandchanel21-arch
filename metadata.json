@@ -1,0 +1,5 @@
+{
+  "name": "MetaBot Forge",
+  "description": "A powerful AI-driven tool to generate automated trading bots (Expert Advisors) for MetaTrader 4 & 5 using natural language strategies.",
+  "requestFramePermissions": []
+}
