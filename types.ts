@@ -72,3 +72,17 @@ export interface BacktestResult {
   data: Candle[]; // The data used for backtest
   equityCurve: { time: string; balance: number }[];
 }
+
+export interface ChatSource {
+  title: string;
+  uri: string;
+}
+
+export interface ChatMessage {
+  id: string;
+  role: 'user' | 'model';
+  text: string;
+  timestamp: Date;
+  sources?: ChatSource[];
+  isThinking?: boolean;
+}

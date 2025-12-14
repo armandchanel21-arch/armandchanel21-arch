@@ -4,6 +4,7 @@ import CodeViewer from './components/CodeViewer';
 import TradingViewWidget from './components/TradingViewWidget';
 import BacktestChart from './components/BacktestChart';
 import ErrorBoundary from './components/ErrorBoundary';
+import ChatBot from './components/ChatBot';
 import { generateTradingBot, runBacktestSimulation } from './services/geminiService';
 import { StrategyConfig, GeneratedBot, Platform, BacktestResult } from './types';
 import { CandlestickChart, Activity, PanelBottom, Sidebar, BarChart2, ChevronRight, ShieldAlert, Cpu } from 'lucide-react';
@@ -318,6 +319,9 @@ const App: React.FC = () => {
         </aside>
 
       </div>
+      
+      {/* AI ChatBot Overlay */}
+      <ChatBot />
     </div>
   );
 };

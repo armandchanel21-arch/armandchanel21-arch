@@ -1,5 +1,5 @@
 import { GoogleGenAI, Type } from "@google/genai";
-import { StrategyConfig, GeneratedBot, BacktestResult, Candle, TradeEvent } from '../types';
+import { StrategyConfig, GeneratedBot, BacktestResult, Candle, TradeEvent, ChatMessage } from '../types';
 
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
@@ -192,6 +192,7 @@ const calculateMACD = (data: Candle[], fast: number, slow: number, sig: number) 
 
 // --- API Functions ---
 
+// 1. Chart Analysis
 export const analyzeChart = async (imageBase64: string): Promise<Partial<StrategyConfig>> => {
   const prompt = `
     You are an unfiltered, expert trading AI agent. Your goal is to extract the MAXIMUM profit potential from the provided chart.
@@ -260,6 +261,7 @@ export const analyzeChart = async (imageBase64: string): Promise<Partial<Strateg
   }
 };
 
+// 2. Bot Generation
 export const generateTradingBot = async (config: StrategyConfig): Promise<GeneratedBot> => {
   const prompt = `
     You are an expert algorithmic trading developer specializing in MQL4 and MQL5.
@@ -330,6 +332,7 @@ export const generateTradingBot = async (config: StrategyConfig): Promise<Genera
   }
 };
 
+// 3. Backtest Simulation
 export const runBacktestSimulation = async (config: StrategyConfig): Promise<BacktestResult> => {
   // 1. Generate Data (More data for valid indicators)
   const totalCandles = 150;
@@ -467,4 +470,51 @@ export const runBacktestSimulation = async (config: StrategyConfig): Promise<Bac
   } catch (error) {
     handleGenAIError(error, "Backtest Simulation");
   }
+};
+
+// 4. Chat with Thinking (Mentor Mode)
+export const chatWithMentor = async (history: {role: 'user' | 'model', text: string}[], message: string): Promise<string> => {
+    try {
+        const chat = ai.chats.create({
+            model: "gemini-3-pro-preview",
+            history: history.map(h => ({
+                role: h.role,
+                parts: [{ text: h.text }]
+            })),
+            config: {
+                thinkingConfig: { thinkingBudget: 32768 },
+            }
+        });
+        
+        const result = await chat.sendMessage({ message });
+        return result.text || "I couldn't generate a response.";
+    } catch (error) {
+        handleGenAIError(error, "Mentor Chat");
+    }
+};
+
+// 5. Search Market Data (Analyst Mode)
+export const searchMarketData = async (query: string): Promise<{ text: string, sources: { uri: string, title: string }[] }> => {
+    try {
+        const response = await ai.models.generateContent({
+            model: 'gemini-2.5-flash',
+            contents: query,
+            config: {
+                tools: [{ googleSearch: {} }]
+            }
+        });
+        
+        // Extract sources from grounding metadata
+        const chunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
+        const sources = chunks
+            .map((c: any) => c.web ? { uri: c.web.uri, title: c.web.title } : null)
+            .filter((s: any) => s);
+
+        return {
+            text: response.text || "No information found.",
+            sources: sources
+        };
+    } catch (error) {
+        handleGenAIError(error, "Market Search");
+    }
 };
