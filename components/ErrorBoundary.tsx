@@ -1,4 +1,4 @@
-import React, { ErrorInfo, ReactNode } from "react";
+import React, { Component, ErrorInfo, ReactNode } from "react";
 import { AlertTriangle, RefreshCw } from "lucide-react";
 
 interface Props {
@@ -10,15 +10,13 @@ interface State {
   error: Error | null;
 }
 
-// Fixed: Explicitly extend React.Component to resolve type errors with this.setState and this.props
-class ErrorBoundary extends React.Component<Props, State> {
+class ErrorBoundary extends Component<Props, State> {
   public state: State = {
     hasError: false,
     error: null,
   };
 
   public static getDerivedStateFromError(error: Error): State {
-    // Update state so the next render will show the fallback UI.
     return { hasError: true, error };
   }
 
@@ -30,16 +28,16 @@ class ErrorBoundary extends React.Component<Props, State> {
     this.setState({ hasError: false, error: null });
   };
 
-  public render() {
+  public render(): ReactNode {
     if (this.state.hasError) {
       return (
         <div className="w-full h-full flex flex-col items-center justify-center p-8 bg-gaming-800/50 border border-red-900/50 rounded-xl text-center shadow-xl animate-fade-in backdrop-blur-sm min-h-[300px]">
           <div className="bg-red-900/30 p-4 rounded-full mb-4 border border-red-500/20">
             <AlertTriangle className="w-10 h-10 text-red-500" />
           </div>
-          <h2 className="text-xl font-bold text-gray-200 mb-2">Component Error</h2>
+          <h2 className="text-xl font-bold text-gray-200 mb-2">System Module Error</h2>
           <p className="text-gray-400 mb-6 max-w-sm text-sm">
-            Something went wrong while rendering this section.
+            A critical component failed to render. This might be due to a connectivity issue or data feed interruption.
           </p>
           {this.state.error && (
             <div className="bg-black/40 p-3 rounded border border-gaming-700 w-full max-w-md mb-6 overflow-auto max-h-32 text-left">
@@ -50,10 +48,10 @@ class ErrorBoundary extends React.Component<Props, State> {
           )}
           <button
             onClick={this.handleReset}
-            className="flex items-center gap-2 px-4 py-2 bg-gaming-700 hover:bg-gaming-600 text-gray-200 rounded-lg transition-colors border border-gaming-600 text-sm font-medium"
+            className="flex items-center gap-2 px-4 py-2 bg-gaming-700 hover:bg-gaming-600 text-gray-200 rounded-lg transition-colors border border-gaming-600 text-sm font-medium uppercase tracking-wide"
           >
             <RefreshCw size={14} />
-            Try Again
+            Re-Initialize
           </button>
         </div>
       );

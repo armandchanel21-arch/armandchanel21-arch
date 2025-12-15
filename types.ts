@@ -13,6 +13,8 @@ export enum Timeframe {
   D1 = 'D1',
 }
 
+export type SignalType = 'STRONG_BUY' | 'BUY' | 'NEUTRAL' | 'SELL' | 'STRONG_SELL';
+
 export interface IndicatorSettings {
   rsiPeriod: number;
   rsiOverbought: number;
@@ -25,6 +27,7 @@ export interface IndicatorSettings {
 }
 
 export interface StrategyConfig {
+  id?: string; // Unique ID for management
   name: string;
   category: string;
   platform: Platform;
@@ -35,6 +38,12 @@ export interface StrategyConfig {
   takeProfit: number; // in pips
   description: string;
   indicators: IndicatorSettings;
+  keyFindings?: string[];
+  magicNumber?: number;
+  slippage?: number;
+  maxSpread?: number;
+  signal?: SignalType;
+  confidence?: number;
 }
 
 export interface GeneratedBot {
@@ -77,6 +86,7 @@ export interface BacktestResult {
 export interface ChatSource {
   title: string;
   uri: string;
+  type?: 'web' | 'map';
 }
 
 export interface ChatMessage {

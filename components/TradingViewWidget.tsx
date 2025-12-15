@@ -11,86 +11,69 @@ const TradingViewWidget: React.FC<TradingViewWidgetProps> = ({ symbol }) => {
     const currentContainer = containerRef.current;
     if (!currentContainer) return;
 
-    // Clear any existing content before appending new script
-    currentContainer.innerHTML = '';
+    // Use a unique ID to ensure clean re-renders
+    const widgetId = `tradingview_${Math.random().toString(36).substring(7)}`;
+    currentContainer.innerHTML = ''; // Clear previous
 
-    // Create the widget container div that the script expects
     const widgetDiv = document.createElement('div');
-    widgetDiv.className = 'tradingview-widget-container__widget h-full w-full';
+    widgetDiv.id = widgetId;
+    widgetDiv.className = 'w-full h-full';
+    widgetDiv.style.height = '100%'; 
+    widgetDiv.style.width = '100%';
     currentContainer.appendChild(widgetDiv);
 
-    // Intelligent Symbol Formatting for Real-Time Data
     let rawSymbol = symbol.toUpperCase().replace('/', '').replace('-', '').trim();
     let formattedSymbol = rawSymbol;
 
-    // Detect if already prefixed
+    // Symbol Mapping Logic
     if (!rawSymbol.includes(':')) {
-        const forexCommon = ['EURUSD', 'GBPUSD', 'USDJPY', 'AUDUSD', 'USDCAD', 'USDCHF', 'NZDUSD', 'EURGBP', 'EURJPY', 'GBPJPY'];
-        const commodities = ['XAUUSD', 'XAGUSD', 'USOIL', 'UKOIL', 'GOLD', 'SILVER'];
-        const indices = ['US30', 'SPX500', 'NAS100', 'GER30', 'DJI'];
-
+        const forexCommon = ['EURUSD', 'GBPUSD', 'USDJPY'];
         if (forexCommon.includes(rawSymbol)) {
-            // FXCM usually provides free real-time forex data in TV
             formattedSymbol = `FX:${rawSymbol}`;
-        } else if (commodities.includes(rawSymbol) || rawSymbol === 'GOLD') {
-             formattedSymbol = rawSymbol === 'GOLD' ? 'OANDA:XAUUSD' : `OANDA:${rawSymbol}`;
-        } else if (indices.includes(rawSymbol)) {
-             formattedSymbol = `CAPITALCOM:${rawSymbol}`;
+        } else if (rawSymbol === 'GOLD') {
+             formattedSymbol = 'OANDA:XAUUSD';
+        } else if (rawSymbol.length <= 5 && !rawSymbol.endsWith('USDT')) {
+             formattedSymbol = `BINANCE:${rawSymbol}USDT`;
         } else {
-             // Default to Binance for Crypto (Primary Use Case for this app)
-             // Check if it looks like a ticker without a pair (e.g. "BTC")
-             // Append USDT if it's just a coin name to ensure a valid pair
-             if (rawSymbol.length <= 5 && !rawSymbol.endsWith('USDT') && !rawSymbol.endsWith('USD') && !rawSymbol.endsWith('EUR')) {
-                 formattedSymbol = `BINANCE:${rawSymbol}USDT`;
-             } else {
-                 formattedSymbol = `BINANCE:${rawSymbol}`;
-             }
+             formattedSymbol = `BINANCE:${rawSymbol}`;
         }
     }
 
     const script = document.createElement('script');
-    script.src = 'https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js';
+    script.src = 'https://s3.tradingview.com/tv.js';
     script.type = 'text/javascript';
     script.async = true;
-    script.innerHTML = JSON.stringify({
-      "autosize": true,
-      "symbol": formattedSymbol,
-      "interval": "60",
-      "timezone": "Etc/UTC",
-      "theme": "dark",
-      "style": "1",
-      "locale": "en",
-      "enable_publishing": false,
-      "hide_top_toolbar": false,
-      "hide_legend": false,
-      "save_image": false,
-      "calendar": false,
-      "hide_volume": false,
-      "support_host": "https://www.tradingview.com",
-      "backgroundColor": "rgba(5, 5, 5, 1)", 
-      "gridColor": "rgba(42, 46, 57, 0.3)",
-      "toolbar_bg": "#121212", 
-      "withdateranges": true,
-      "allow_symbol_change": true,
-      "details": false,
-      "hotlist": false,
-      "show_popup_button": true,
-      "popup_width": "1000",
-      "popup_height": "650"
-    });
-
+    script.onload = () => {
+        if (typeof (window as any).TradingView !== 'undefined') {
+            new (window as any).TradingView.widget({
+                "autosize": true,
+                "symbol": formattedSymbol,
+                "interval": "60",
+                "timezone": "Etc/UTC",
+                "theme": "dark",
+                "style": "1",
+                "locale": "en",
+                "toolbar_bg": "#f1f3f6",
+                "enable_publishing": false,
+                "hide_side_toolbar": false,
+                "allow_symbol_change": true,
+                "container_id": widgetId,
+                "hide_volume": false,
+                "save_image": false,
+                "backgroundColor": "#000000"
+            });
+        }
+    };
     currentContainer.appendChild(script);
 
     return () => {
-        if (currentContainer) {
-            currentContainer.innerHTML = '';
-        }
+        if (currentContainer) currentContainer.innerHTML = '';
     };
   }, [symbol]);
 
   return (
-    <div className="tradingview-widget-container h-full w-full bg-gaming-950" ref={containerRef}>
-      {/* Content injected by useEffect */}
+    <div className="w-full h-full bg-black relative" ref={containerRef} style={{ minHeight: '300px' }}>
+      {/* Widget Injected Here */}
     </div>
   );
 };

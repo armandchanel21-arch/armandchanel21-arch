@@ -1,18 +1,17 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { Platform, Timeframe, StrategyConfig, IndicatorSettings } from '../types';
-import { Bot, Sliders, X, Save, FolderOpen, Trash2, Check, Camera, Activity, Zap, Settings2, Code, Play, GripVertical, Plus } from 'lucide-react';
-import { analyzeChart } from '../services/geminiService';
+import React, { useState, useEffect } from 'react';
+import { Platform, Timeframe, StrategyConfig, IndicatorSettings, BacktestResult } from '../types';
+import { Bot, Sliders, Save, FolderOpen, Trash2, Check, Zap, Play, LayoutTemplate, Activity, ArrowRight, Camera, X } from 'lucide-react';
+import { runBacktestSimulation, analyzeChart } from '../services/geminiService';
+import BacktestChart from './BacktestChart';
 
 interface StrategyBuilderProps {
-  onSubmit: (config: StrategyConfig) => void;
-  onBacktest: (config: StrategyConfig) => void;
-  isGenerating: boolean;
-  onConfigChange: (config: Partial<StrategyConfig>) => void;
+  initialConfig: StrategyConfig | null;
+  onUpdateConfig: (config: StrategyConfig) => void;
+  onSaveStrategy: (config: StrategyConfig) => void;
+  onNavigateToGenerator: () => void;
+  onError: (msg: string) => void;
+  onSuccess: (msg: string) => void;
 }
-
-const CATEGORIES = [
-  "Trend Following", "Scalping", "Breakout", "Mean Reversion", "Grid System", "Price Action"
-];
 
 const DEFAULT_INDICATORS: IndicatorSettings = {
   rsiPeriod: 14,
@@ -25,7 +24,6 @@ const DEFAULT_INDICATORS: IndicatorSettings = {
   macdSignal: 9
 };
 
-// Section Header
 const SectionHeader = ({ title, count }: { title: string, count?: number }) => (
   <div className="flex items-center justify-between text-[10px] font-bold text-gaming-500 uppercase tracking-wider mb-2 mt-4 px-1">
     <span>{title}</span>
@@ -33,15 +31,15 @@ const SectionHeader = ({ title, count }: { title: string, count?: number }) => (
   </div>
 );
 
-const ConfigInput: React.FC<{ label: string; children: React.ReactNode }> = ({ label, children }) => (
-  <div className="bg-gaming-800 rounded p-2 border border-gaming-700 hover:border-gaming-600 transition-colors">
-    <label className="block text-[9px] font-bold text-gaming-500 mb-1 uppercase tracking-wide">{label}</label>
+const ConfigInput: React.FC<{ label: string; children: React.ReactNode; fullWidth?: boolean }> = ({ label, children, fullWidth }) => (
+  <div className={`bg-gaming-900/50 rounded-lg p-3 border border-gaming-800 hover:border-gaming-700 transition-colors ${fullWidth ? 'col-span-full' : ''}`}>
+    <label className="block text-[9px] font-bold text-gaming-500 mb-2 uppercase tracking-wide">{label}</label>
     {children}
   </div>
 );
 
-const StrategyBuilder: React.FC<StrategyBuilderProps> = ({ onSubmit, onBacktest, isGenerating, onConfigChange }) => {
-  const [config, setConfig] = useState<StrategyConfig>({
+const StrategyBuilder: React.FC<StrategyBuilderProps> = ({ initialConfig, onUpdateConfig, onSaveStrategy, onNavigateToGenerator, onError, onSuccess }) => {
+  const [config, setConfig] = useState<StrategyConfig>(initialConfig || {
     name: 'Alpha_Bot_v1',
     category: 'Trend Following',
     platform: Platform.MT5,
@@ -51,64 +49,59 @@ const StrategyBuilder: React.FC<StrategyBuilderProps> = ({ onSubmit, onBacktest,
     stopLoss: 50,
     takeProfit: 100,
     description: 'Buy when RSI(14) crosses above 30. Sell when RSI(14) crosses below 70.',
-    indicators: DEFAULT_INDICATORS
+    indicators: DEFAULT_INDICATORS,
+    magicNumber: 123456,
+    slippage: 3,
+    maxSpread: 20
   });
 
+  const [isProMode, setIsProMode] = useState(false);
+  const [isSimulating, setIsSimulating] = useState(false);
+  const [simResult, setSimResult] = useState<BacktestResult | null>(null);
+  
+  // Image Analysis State
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [rawImage, setRawImage] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [autoTuned, setAutoTuned] = useState(false);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
 
-  // Save/Load State
-  const [savedStrategies, setSavedStrategies] = useState<StrategyConfig[]>([]);
-  const [showLoadMenu, setShowLoadMenu] = useState(false);
-  const [saveFeedback, setSaveFeedback] = useState(false);
-
-  const slInvalid = config.stopLoss <= 0;
-  const tpInvalid = config.takeProfit <= 0;
-  const formInvalid = slInvalid || tpInvalid;
-
+  // Sync prop changes (e.g. from Analyst or Edit Dashboard)
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem('metabot_strategies');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        setSavedStrategies(parsed.map((s: any) => ({ 
-            ...s, 
-            category: s.category || 'Custom',
-            indicators: s.indicators || DEFAULT_INDICATORS 
-        })));
-      }
-    } catch (e) { console.error(e); }
-  }, []);
-
-  useEffect(() => {
-    // Sync symbol changes to parent for Chart updates
-    const timer = setTimeout(() => {
-        onConfigChange({ symbol: config.symbol });
-    }, 500);
-    return () => clearTimeout(timer);
-  }, [config.symbol, onConfigChange]);
+    if (initialConfig) {
+        setConfig(prev => ({ 
+            ...prev, 
+            ...initialConfig,
+            magicNumber: initialConfig.magicNumber ?? prev.magicNumber ?? 123456,
+            slippage: initialConfig.slippage ?? prev.slippage ?? 3,
+            maxSpread: initialConfig.maxSpread ?? prev.maxSpread ?? 20
+        }));
+    }
+  }, [initialConfig]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
-    setConfig(prev => ({
-      ...prev,
-      [name]: ['lotSize', 'stopLoss', 'takeProfit'].includes(name) ? parseFloat(value) : value
-    }));
+    const numericFields = ['lotSize', 'stopLoss', 'takeProfit', 'magicNumber', 'slippage', 'maxSpread'];
+    const newConfig = {
+      ...config,
+      [name]: numericFields.includes(name) ? parseFloat(value) : value
+    };
+    setConfig(newConfig);
+    onUpdateConfig(newConfig);
   };
 
   const handleIndicatorChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    setConfig(prev => ({
-      ...prev,
+    const newConfig = {
+      ...config,
       indicators: {
-        ...prev.indicators,
+        ...config.indicators,
         [name]: name === 'maType' ? value : parseFloat(value) || 0
       }
-    }));
+    };
+    setConfig(newConfig);
+    onUpdateConfig(newConfig);
   };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -132,14 +125,17 @@ const StrategyBuilder: React.FC<StrategyBuilderProps> = ({ onSubmit, onBacktest,
     setAnalysisError(null);
     try {
       const analysis = await analyzeChart(rawImage);
-      setConfig(prev => ({
-            ...prev,
-            description: analysis.description || prev.description,
-            category: analysis.category || prev.category,
-            stopLoss: analysis.stopLoss || prev.stopLoss,
-            takeProfit: analysis.takeProfit || prev.takeProfit,
-            indicators: { ...prev.indicators, ...(analysis.indicators || {}) }
-      }));
+      const newConfig = {
+            ...config,
+            description: analysis.description || config.description,
+            category: analysis.category || config.category,
+            stopLoss: analysis.stopLoss || config.stopLoss,
+            takeProfit: analysis.takeProfit || config.takeProfit,
+            indicators: { ...config.indicators, ...(analysis.indicators || {}) },
+            signal: analysis.signal
+      };
+      setConfig(newConfig);
+      onUpdateConfig(newConfig);
       setAutoTuned(true);
       setTimeout(() => setAutoTuned(false), 3000);
     } catch (error: any) { 
@@ -147,226 +143,245 @@ const StrategyBuilder: React.FC<StrategyBuilderProps> = ({ onSubmit, onBacktest,
     } finally { setIsAnalyzing(false); }
   };
 
-  const handleSaveStrategy = () => {
-    if (!config.name.trim()) return alert("Enter name.");
-    const newStrategies = [...savedStrategies];
-    const existingIndex = newStrategies.findIndex(s => s.name === config.name);
-    if (existingIndex >= 0) {
-      if (!window.confirm(`Overwrite "${config.name}"?`)) return;
-      newStrategies[existingIndex] = config;
-    } else {
-      newStrategies.push(config);
-    }
-    setSavedStrategies(newStrategies);
-    localStorage.setItem('metabot_strategies', JSON.stringify(newStrategies));
-    setSaveFeedback(true);
-    setTimeout(() => setSaveFeedback(false), 2000);
+  const handleRunSimulation = async () => {
+      setIsSimulating(true);
+      setSimResult(null);
+      try {
+          const result = await runBacktestSimulation(config);
+          setSimResult(result);
+          onSuccess("Simulation complete! Review accuracy below.");
+      } catch (e: any) {
+          onError(e.message || "Simulation failed");
+      } finally {
+          setIsSimulating(false);
+      }
   };
 
-  const handleLoadStrategy = (s: StrategyConfig) => {
-    const loadedConfig = { ...s, indicators: s.indicators || DEFAULT_INDICATORS };
-    setConfig(loadedConfig);
-    setShowLoadMenu(false);
-    onConfigChange(loadedConfig);
-  };
-
-  const handleDeleteStrategy = (e: React.MouseEvent, name: string) => {
-    e.stopPropagation();
-    const newStrategies = savedStrategies.filter(s => s.name !== name);
-    setSavedStrategies(newStrategies);
-    localStorage.setItem('metabot_strategies', JSON.stringify(newStrategies));
+  const handleSave = () => {
+      if (!config.name) {
+          onError("Please provide a name for your bot strategy.");
+          return;
+      }
+      onSaveStrategy(config);
+      onSuccess(`Strategy "${config.name}" saved to dashboard.`);
   };
 
   return (
-    <div className="flex flex-col h-full bg-gaming-900 text-gaming-400">
+    <div className="flex flex-col h-full bg-gaming-900 text-gaming-400 font-sans">
       
-      {/* Header */}
-      <div className="bg-gaming-950 border-b border-gaming-800 p-3 flex justify-between items-center font-bold uppercase tracking-wider text-sm shrink-0">
-         <div className="flex items-center gap-2 text-white">
-            <Sliders size={16} className="text-gaming-accent" />
-            <span>Strategy Builder</span>
+      {/* Top Bar */}
+      <div className="bg-gaming-950 border-b border-gaming-800 px-6 py-4 flex justify-between items-center shrink-0">
+         <div className="flex items-center gap-3">
+            <div className="p-2 bg-gaming-800 rounded border border-gaming-700">
+                <LayoutTemplate size={20} className="text-gaming-accent" />
+            </div>
+            <div>
+                <h2 className="text-white font-black text-lg uppercase tracking-tight leading-none">Strategy Studio</h2>
+                <div className="text-[10px] font-bold text-gaming-500 uppercase tracking-widest mt-1">Design & Backtest</div>
+            </div>
          </div>
-         <span className="bg-gaming-800 px-2 py-0.5 rounded text-[9px] text-gaming-500 border border-gaming-700">PRO MODE</span>
+
+         <div className="flex items-center gap-2">
+             <button onClick={handleSave} className="flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-bold border border-gaming-700 text-gaming-400 hover:text-white hover:bg-gaming-800 transition-all">
+                 <Save size={12} /> Save
+             </button>
+             <button 
+                onClick={() => setIsProMode(!isProMode)}
+                className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all border ${isProMode ? 'bg-gaming-800 border-gaming-accent text-white' : 'border-gaming-700 text-gaming-500'}`}
+             >
+                {isProMode ? 'PRO MODE' : 'LITE MODE'}
+             </button>
+         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-3 space-y-4 custom-scrollbar">
-        
-        {/* Name & Load/Save */}
-        <div className="flex justify-between items-center bg-gaming-800 p-2 rounded border border-gaming-700">
-            <input
-              type="text"
-              name="name"
-              value={config.name}
-              onChange={handleChange}
-              className="bg-transparent border-none text-white font-bold text-xs focus:ring-0 placeholder-gaming-600 w-full"
-              placeholder="Strategy Name..."
-            />
-            <div className="flex gap-1 shrink-0">
-                <div className="relative">
-                    <button type="button" onClick={() => setShowLoadMenu(!showLoadMenu)} className="p-1.5 hover:bg-gaming-700 rounded text-gaming-500 hover:text-white transition-colors" title="Load">
-                        <FolderOpen size={14} />
-                    </button>
-                    {showLoadMenu && (
-                        <div className="absolute right-0 top-full mt-1 w-48 bg-gaming-800 border border-gaming-700 shadow-2xl rounded z-50">
-                            {savedStrategies.length === 0 ? (
-                                <div className="p-2 text-[10px] text-gaming-500 text-center">No saved strategies</div>
-                            ) : (
-                                savedStrategies.map((s, i) => (
-                                    <div key={i} onClick={() => handleLoadStrategy(s)} className="p-2 border-b border-gaming-700 hover:bg-gaming-700 cursor-pointer flex justify-between group text-xs text-white">
-                                        <span>{s.name}</span>
-                                        <Trash2 size={12} className="text-gaming-500 hover:text-danger" onClick={(e) => handleDeleteStrategy(e, s.name)} />
+      <div className="flex-1 overflow-y-auto p-4 md:p-6 custom-scrollbar">
+         <div className="max-w-6xl mx-auto space-y-6">
+            
+            {/* Input Grid */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                {/* Column 1: Identity & Risk */}
+                <div className="space-y-4">
+                    <div className="bg-gaming-900/50 p-4 rounded-xl border border-gaming-800">
+                        <label className="text-[10px] font-bold text-gaming-500 uppercase mb-2 block">Strategy Name</label>
+                        <input
+                            type="text"
+                            name="name"
+                            value={config.name}
+                            onChange={handleChange}
+                            className="w-full bg-gaming-950 border border-gaming-700 rounded-lg px-3 py-2 text-sm text-white font-bold"
+                        />
+                    </div>
+                    
+                    <div className="bg-gaming-800 border border-gaming-700 rounded-xl p-4">
+                        <SectionHeader title="Asset & Risk" />
+                        <div className="grid grid-cols-2 gap-3 mb-3">
+                            <ConfigInput label="Symbol">
+                                <input type="text" name="symbol" value={config.symbol} onChange={handleChange} className="w-full bg-transparent text-white font-mono uppercase text-sm" />
+                            </ConfigInput>
+                            <ConfigInput label="Timeframe">
+                                <select name="timeframe" value={config.timeframe} onChange={handleChange} className="w-full bg-transparent text-white font-mono text-sm">
+                                    {Object.values(Timeframe).map(tf => <option key={tf} value={tf}>{tf}</option>)}
+                                </select>
+                            </ConfigInput>
+                        </div>
+                        <div className="grid grid-cols-3 gap-2 mb-3">
+                            <ConfigInput label="Lot Size">
+                                <input type="number" name="lotSize" step="0.01" value={config.lotSize} onChange={handleChange} className="w-full bg-transparent text-white font-bold text-sm" />
+                            </ConfigInput>
+                            <ConfigInput label="SL (Pips)">
+                                <input type="number" name="stopLoss" value={config.stopLoss} onChange={handleChange} className="w-full bg-transparent text-danger font-bold text-sm" />
+                            </ConfigInput>
+                            <ConfigInput label="TP (Pips)">
+                                <input type="number" name="takeProfit" value={config.takeProfit} onChange={handleChange} className="w-full bg-transparent text-gaming-accent font-bold text-sm" />
+                            </ConfigInput>
+                        </div>
+                        
+                        <SectionHeader title="Execution Settings" />
+                        <div className="grid grid-cols-3 gap-2">
+                             <ConfigInput label="Magic #">
+                                <input type="number" name="magicNumber" value={config.magicNumber || ''} onChange={handleChange} className="w-full bg-transparent text-white text-sm" placeholder="123456" />
+                             </ConfigInput>
+                             <ConfigInput label="Slippage">
+                                <input type="number" name="slippage" value={config.slippage || ''} onChange={handleChange} className="w-full bg-transparent text-white text-sm" placeholder="3" />
+                             </ConfigInput>
+                             <ConfigInput label="Max Spread">
+                                <input type="number" name="maxSpread" value={config.maxSpread || ''} onChange={handleChange} className="w-full bg-transparent text-white text-sm" placeholder="0" />
+                             </ConfigInput>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Column 2: Logic Description */}
+                <div className="lg:col-span-2 flex flex-col gap-4">
+                    <div className="bg-gaming-800 border border-gaming-700 rounded-xl p-4 flex-1 flex flex-col">
+                        <div className="flex justify-between items-center mb-2">
+                             <label className="text-[10px] font-bold text-gaming-500 uppercase">Trading Logic (Natural Language)</label>
+                             <div className="flex items-center gap-2">
+                                 {autoTuned && <span className="text-[9px] bg-gaming-accent text-black font-bold px-2 py-0.5 rounded animate-pulse">AI TUNED</span>}
+                                 <span className="text-[9px] bg-gaming-900 px-2 py-0.5 rounded text-gaming-400">AI Driven</span>
+                             </div>
+                        </div>
+                        
+                         {/* AI Auto Tune Section */}
+                         <div className="mb-3">
+                             {!imagePreview ? (
+                                <button 
+                                    type="button" 
+                                    onClick={() => fileInputRef.current?.click()}
+                                    className="w-full flex items-center justify-center gap-2 py-2 border border-dashed border-gaming-700 hover:border-gaming-500 rounded bg-gaming-900/30 text-xs text-gaming-500 hover:text-white transition-all group"
+                                >
+                                    <Camera size={14} className="group-hover:text-gaming-accent" />
+                                    <span>Upload Chart for Vision Analysis</span>
+                                </button>
+                             ) : (
+                                <div className="relative rounded overflow-hidden border border-gaming-600 h-24 bg-black w-full flex items-center justify-center">
+                                    <img src={imagePreview} className="absolute inset-0 w-full h-full object-cover opacity-50" alt="Target" />
+                                    <div className="relative z-10 flex items-center gap-3">
+                                        <button type="button" onClick={handleAnalyzeChart} disabled={isAnalyzing} className="bg-gaming-accent text-gaming-950 px-3 py-1.5 rounded font-bold text-xs flex items-center gap-1 hover:brightness-110 shadow-lg">
+                                            {isAnalyzing ? <div className="animate-spin h-3 w-3 border-2 border-black rounded-full border-t-transparent"></div> : <Zap size={14} />}
+                                            RUN VISION
+                                        </button>
+                                        <button type="button" onClick={() => { setImagePreview(null); setRawImage(null); }} className="bg-black/50 p-1.5 rounded text-white hover:text-danger border border-white/20 hover:border-danger/50 backdrop-blur-sm">
+                                            <X size={14} />
+                                        </button>
                                     </div>
-                                ))
+                                </div>
+                             )}
+                             <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
+                             {analysisError && <div className="text-[10px] text-danger mt-1 text-center">{analysisError}</div>}
+                        </div>
+
+                        <textarea
+                            name="description"
+                            value={config.description}
+                            onChange={handleChange}
+                            className="flex-1 w-full bg-gaming-950 border border-gaming-700 rounded-lg p-4 text-gray-300 text-sm focus:border-gaming-accent outline-none resize-none font-mono leading-relaxed"
+                            placeholder="Describe your strategy here..."
+                        />
+                    </div>
+                    
+                    {/* Indicators (Collapsible in Lite, Expanded in Pro) */}
+                    <div className="bg-gaming-900/50 border border-gaming-800 rounded-xl p-4">
+                        <div className="flex justify-between items-center mb-3">
+                            <div className="text-[10px] font-bold text-gaming-500 uppercase">Indicator Config</div>
+                            <div className="flex items-center gap-2">
+                                <Sliders size={12} className="text-gaming-500" />
+                            </div>
+                        </div>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                            <ConfigInput label="RSI Period">
+                                <input type="number" name="rsiPeriod" value={config.indicators.rsiPeriod} onChange={handleIndicatorChange} className="w-full bg-transparent text-white text-center" />
+                            </ConfigInput>
+                            <ConfigInput label="MA Period">
+                                <input type="number" name="maPeriod" value={config.indicators.maPeriod} onChange={handleIndicatorChange} className="w-full bg-transparent text-white text-center" />
+                            </ConfigInput>
+                            {isProMode && (
+                                <>
+                                    <ConfigInput label="MACD Fast">
+                                        <input type="number" name="macdFast" value={config.indicators.macdFast} onChange={handleIndicatorChange} className="w-full bg-transparent text-white text-center" />
+                                    </ConfigInput>
+                                    <ConfigInput label="MACD Slow">
+                                        <input type="number" name="macdSlow" value={config.indicators.macdSlow} onChange={handleIndicatorChange} className="w-full bg-transparent text-white text-center" />
+                                    </ConfigInput>
+                                </>
                             )}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* Simulation Results Area (Inline) */}
+            <div className="border-t border-gaming-800 pt-6">
+                <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                        <Activity size={16} className="text-gaming-accent" /> 
+                        Simulation & Accuracy Check
+                    </h3>
+                </div>
+                
+                <div className="bg-black border border-gaming-800 rounded-xl overflow-hidden min-h-[300px] relative">
+                    {!simResult ? (
+                        <div className="absolute inset-0 flex flex-col items-center justify-center text-gaming-700">
+                             {isSimulating ? (
+                                 <div className="text-center">
+                                     <div className="w-10 h-10 border-2 border-gaming-accent border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                                     <p className="text-xs font-bold text-gaming-500 animate-pulse">Running Backtest on Real Data...</p>
+                                 </div>
+                             ) : (
+                                 <>
+                                    <Play size={48} className="mb-4 opacity-20" />
+                                    <p className="text-xs font-bold uppercase tracking-widest">Ready to Simulate</p>
+                                    <p className="text-[10px] mt-1">Click "Run Simulation" to test accuracy.</p>
+                                 </>
+                             )}
+                        </div>
+                    ) : (
+                        <div className="h-[400px]">
+                            <BacktestChart result={simResult} onClose={() => setSimResult(null)} />
                         </div>
                     )}
                 </div>
-                <button type="button" onClick={handleSaveStrategy} className={`p-1.5 hover:bg-gaming-700 rounded transition-colors ${saveFeedback ? 'text-gaming-accent' : 'text-gaming-500 hover:text-white'}`} title="Save">
-                    {saveFeedback ? <Check size={14} /> : <Save size={14} />}
-                </button>
             </div>
-        </div>
-
-        {/* Assets */}
-        <SectionHeader title="Asset Configuration" />
-        <div className="grid grid-cols-2 gap-2">
-            <ConfigInput label="Target Symbol">
-                <input
-                  type="text"
-                  name="symbol"
-                  value={config.symbol}
-                  onChange={handleChange}
-                  className="w-full bg-transparent border-none text-white font-mono text-xs focus:ring-0 p-0 uppercase"
-                />
-            </ConfigInput>
-            <ConfigInput label="Timeframe">
-                <select
-                    name="timeframe"
-                    value={config.timeframe}
-                    onChange={handleChange}
-                    className="w-full bg-transparent border-none text-white font-mono text-xs focus:ring-0 p-0"
-                >
-                    {Object.values(Timeframe).map(tf => <option key={tf} value={tf}>{tf}</option>)}
-                </select>
-            </ConfigInput>
-        </div>
-
-        {/* AI Logic Builder */}
-        <SectionHeader title="Logic Matrix" />
-        <div className="bg-gaming-800 rounded border border-gaming-700 p-2 space-y-2">
-             <div className="flex items-center justify-between">
-                <label className="text-[9px] font-bold text-gaming-500 uppercase">Strategy Class</label>
-                <select
-                    name="category"
-                    value={config.category}
-                    onChange={handleChange}
-                    className={`bg-gaming-900 border border-gaming-600 rounded text-xs text-white px-2 py-0.5 outline-none focus:border-gaming-accent ${autoTuned ? 'text-gaming-accent' : ''}`}
-                    >
-                    {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-                </select>
-             </div>
-             
-             {/* Text Area (Simulating Logic Blocks) */}
-             <div>
-                <textarea
-                    name="description"
-                    rows={4}
-                    value={config.description}
-                    onChange={handleChange}
-                    className={`w-full bg-gaming-900 border border-gaming-600 rounded p-2 text-gray-300 text-xs mt-1 focus:border-gaming-accent focus:ring-0 outline-none resize-none font-mono leading-relaxed ${autoTuned ? 'border-gaming-accent' : ''}`}
-                    placeholder="// Describe logic..."
-                />
-             </div>
-             
-             {/* AI Upload Button */}
-             {!imagePreview ? (
-                <button 
-                    type="button" 
-                    onClick={() => fileInputRef.current?.click()}
-                    className="w-full flex items-center justify-center gap-2 py-2 border border-dashed border-gaming-600 rounded hover:border-gaming-400 text-[10px] text-gaming-500 hover:text-white transition-all bg-gaming-900/50"
-                >
-                    <Camera size={12} />
-                    <span>Import Chart Structure (AI)</span>
-                </button>
-             ) : (
-                <div className="relative rounded overflow-hidden border border-gaming-600 h-16 bg-black group">
-                    <img src={imagePreview} className="w-full h-full object-cover opacity-60" alt="Target" />
-                    <div className="absolute inset-0 flex items-center justify-center gap-2 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button type="button" onClick={handleAnalyzeChart} disabled={isAnalyzing} className="bg-gaming-accent text-gaming-950 px-2 py-1 rounded font-bold text-[10px] flex items-center gap-1">
-                            {isAnalyzing ? <span className="animate-spin">⌛</span> : <Zap size={10} />} ANALYZE
-                        </button>
-                        <button type="button" onClick={() => { setImagePreview(null); setRawImage(null); }} className="bg-gaming-800 p-1 rounded text-white">
-                            <X size={12} />
-                        </button>
-                    </div>
-                </div>
-             )}
-             <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
-             {analysisError && <div className="text-[9px] text-danger">{analysisError}</div>}
-        </div>
-
-        <SectionHeader title="Risk Profile" />
-        <div className="grid grid-cols-3 gap-2">
-             <ConfigInput label="Lot Size">
-                 <input type="number" name="lotSize" step="0.01" value={config.lotSize} onChange={handleChange} className="w-full bg-transparent text-white font-bold text-sm focus:ring-0 border-none p-0" />
-             </ConfigInput>
-             <ConfigInput label="SL (Pips)">
-                 <input type="number" name="stopLoss" value={config.stopLoss} onChange={handleChange} className="w-full bg-transparent text-danger font-bold text-sm focus:ring-0 border-none p-0" />
-             </ConfigInput>
-             <ConfigInput label="TP (Pips)">
-                 <input type="number" name="takeProfit" value={config.takeProfit} onChange={handleChange} className="w-full bg-transparent text-gaming-accent font-bold text-sm focus:ring-0 border-none p-0" />
-             </ConfigInput>
-        </div>
-
-        {/* Indicators */}
-        <details className="group bg-gaming-800 border border-gaming-700 rounded overflow-hidden">
-            <summary className="flex items-center justify-between p-2 cursor-pointer text-xs font-bold text-gaming-400 group-open:text-white hover:bg-gaming-700 select-none">
-                <span>TECHNICAL INDICATORS</span>
-                <Sliders size={12} />
-            </summary>
-            <div className="p-2 space-y-2 border-t border-gaming-700 bg-gaming-900/50">
-                 <div className="grid grid-cols-3 gap-1">
-                    <input type="number" name="rsiPeriod" value={config.indicators.rsiPeriod} onChange={handleIndicatorChange} placeholder="RSI Per" className="bg-gaming-800 border border-gaming-600 rounded px-1 py-1 text-xs text-white text-center" />
-                    <input type="number" name="rsiOverbought" value={config.indicators.rsiOverbought} onChange={handleIndicatorChange} className="bg-gaming-800 border border-gaming-600 rounded px-1 py-1 text-xs text-danger text-center" />
-                    <input type="number" name="rsiOversold" value={config.indicators.rsiOversold} onChange={handleIndicatorChange} className="bg-gaming-800 border border-gaming-600 rounded px-1 py-1 text-xs text-gaming-accent text-center" />
-                 </div>
-                 <div className="flex gap-1">
-                    <input type="number" name="maPeriod" value={config.indicators.maPeriod} onChange={handleIndicatorChange} className="flex-1 bg-gaming-800 border border-gaming-600 rounded px-1 py-1 text-xs text-white text-center" />
-                    <select name="maType" value={config.indicators.maType} onChange={handleIndicatorChange} className="flex-1 bg-gaming-800 border border-gaming-600 rounded px-1 py-1 text-xs text-white">
-                        <option value="SMA">SMA</option>
-                        <option value="EMA">EMA</option>
-                    </select>
-                 </div>
-            </div>
-        </details>
+         </div>
       </div>
 
-      {/* Footer */}
-      <div className="p-3 bg-gaming-950 border-t border-gaming-700 shrink-0 space-y-2">
-         <div className="flex justify-between text-[10px] text-gaming-500 mb-1 font-bold uppercase tracking-wider">
-             <span>Reward Ratio</span>
-             <span className="text-white font-mono">1:{(config.takeProfit / config.stopLoss).toFixed(1)}</span>
-         </div>
-         
-         <div className="flex gap-2">
-            <button
-                type="button"
-                onClick={() => onBacktest(config)}
-                disabled={isGenerating || formInvalid}
-                className="flex-1 bg-gaming-800 hover:bg-gaming-700 text-white font-bold py-3 rounded text-xs border border-gaming-700 uppercase tracking-wide flex items-center justify-center gap-1 disabled:opacity-50 transition-colors"
-            >
-                <Play size={14} className="text-gaming-accent" /> 
-                <span className="mt-0.5">Simulate</span>
-            </button>
-            <button
-                type="button"
-                onClick={() => onSubmit(config)}
-                disabled={isGenerating || formInvalid}
-                className="flex-[2] bg-gaming-accent hover:bg-gaming-accentHover text-gaming-950 font-black py-3 rounded text-sm uppercase tracking-wider shadow-[0_0_15px_rgba(34,197,94,0.3)] hover:shadow-[0_0_20px_rgba(34,197,94,0.5)] transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:shadow-none"
-            >
-                {isGenerating ? <div className="animate-spin h-4 w-4 border-2 border-black rounded-full border-t-transparent"></div> : <><Code size={16} strokeWidth={3} /> EXPORT BOT</>}
-            </button>
-         </div>
+      {/* Action Footer */}
+      <div className="p-4 bg-gaming-950 border-t border-gaming-700 shrink-0 flex gap-4">
+          <button
+            onClick={handleRunSimulation}
+            disabled={isSimulating}
+            className="flex-1 bg-gaming-800 hover:bg-gaming-700 text-white font-bold py-3 rounded-xl text-sm border border-gaming-700 uppercase tracking-wide flex items-center justify-center gap-2 transition-all"
+          >
+             <Play size={16} className="text-gaming-accent" />
+             {isSimulating ? 'Testing...' : 'Run Simulation'}
+          </button>
+          
+          <button
+            onClick={onNavigateToGenerator}
+            className="flex-[2] bg-gaming-accent hover:bg-gaming-accentHover text-gaming-950 font-black py-3 rounded-xl text-sm uppercase tracking-wide flex items-center justify-center gap-2 transition-all shadow-[0_0_15px_rgba(34,197,94,0.3)] hover:shadow-[0_0_25px_rgba(34,197,94,0.5)]"
+          >
+             Generate Bot Code <ArrowRight size={18} strokeWidth={2.5} />
+          </button>
       </div>
 
     </div>
