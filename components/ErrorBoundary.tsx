@@ -10,6 +10,7 @@ interface State {
   error: Error | null;
 }
 
+// Fixed: Explicitly extend React.Component to resolve type errors with this.setState and this.props
 class ErrorBoundary extends React.Component<Props, State> {
   public state: State = {
     hasError: false,
@@ -32,7 +33,7 @@ class ErrorBoundary extends React.Component<Props, State> {
   public render() {
     if (this.state.hasError) {
       return (
-        <div className="w-full h-full flex flex-col items-center justify-center p-8 bg-trade-800/50 border border-red-900/50 rounded-xl text-center shadow-xl animate-fade-in backdrop-blur-sm min-h-[300px]">
+        <div className="w-full h-full flex flex-col items-center justify-center p-8 bg-gaming-800/50 border border-red-900/50 rounded-xl text-center shadow-xl animate-fade-in backdrop-blur-sm min-h-[300px]">
           <div className="bg-red-900/30 p-4 rounded-full mb-4 border border-red-500/20">
             <AlertTriangle className="w-10 h-10 text-red-500" />
           </div>
@@ -41,7 +42,7 @@ class ErrorBoundary extends React.Component<Props, State> {
             Something went wrong while rendering this section.
           </p>
           {this.state.error && (
-            <div className="bg-black/40 p-3 rounded border border-trade-700 w-full max-w-md mb-6 overflow-auto max-h-32 text-left">
+            <div className="bg-black/40 p-3 rounded border border-gaming-700 w-full max-w-md mb-6 overflow-auto max-h-32 text-left">
               <code className="text-xs text-red-300 font-mono break-all whitespace-pre-wrap">
                 {this.state.error.message}
               </code>
@@ -49,7 +50,7 @@ class ErrorBoundary extends React.Component<Props, State> {
           )}
           <button
             onClick={this.handleReset}
-            className="flex items-center gap-2 px-4 py-2 bg-trade-700 hover:bg-trade-600 text-gray-200 rounded-lg transition-colors border border-trade-600 text-sm font-medium"
+            className="flex items-center gap-2 px-4 py-2 bg-gaming-700 hover:bg-gaming-600 text-gray-200 rounded-lg transition-colors border border-gaming-600 text-sm font-medium"
           >
             <RefreshCw size={14} />
             Try Again

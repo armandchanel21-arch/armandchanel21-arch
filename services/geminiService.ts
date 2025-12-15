@@ -1,5 +1,5 @@
 import { GoogleGenAI, Type } from "@google/genai";
-import { StrategyConfig, GeneratedBot, BacktestResult, Candle, TradeEvent, ChatMessage } from '../types';
+import { StrategyConfig, GeneratedBot, BacktestResult, Candle, TradeEvent, ChatMessage, Timeframe } from '../types';
 
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
@@ -45,34 +45,60 @@ const handleGenAIError = (error: any, context: string): never => {
 
 // --- Helpers ---
 
-// Generate synthetic market data (Random Walk with momentum)
-const generateSyntheticData = (symbol: string, periods: number = 150): Candle[] => {
-  const data: Candle[] = [];
-  let price = symbol.includes('JPY') ? 145.00 : 1.1000;
-  const volatility = symbol.includes('JPY') ? 0.05 : 0.0005;
-  
-  // Create a realistic-looking chart
-  for (let i = 0; i < periods; i++) {
-    const change = (Math.random() - 0.5) * volatility * 2 + (Math.sin(i / 10) * volatility * 0.5);
-    const open = price;
-    const close = price + change;
-    const high = Math.max(open, close) + Math.random() * volatility * 0.5;
-    const low = Math.min(open, close) - Math.random() * volatility * 0.5;
-    
-    price = close;
-    
-    const date = new Date();
-    date.setHours(date.getHours() - (periods - i));
-    
-    data.push({
-      time: date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      open: parseFloat(open.toFixed(5)),
-      high: parseFloat(high.toFixed(5)),
-      low: parseFloat(low.toFixed(5)),
-      close: parseFloat(close.toFixed(5)),
-    });
+// Map App Timeframe to Binance API Interval
+const mapTimeframeToBinance = (tf: Timeframe): string => {
+  switch(tf) {
+    case Timeframe.M1: return '1m';
+    case Timeframe.M5: return '5m';
+    case Timeframe.M15: return '15m';
+    case Timeframe.M30: return '30m';
+    case Timeframe.H1: return '1h';
+    case Timeframe.H4: return '4h';
+    case Timeframe.D1: return '1d';
+    default: return '1h';
   }
-  return data;
+};
+
+// FETCH REAL MARKET DATA
+const fetchRealMarketData = async (symbol: string, timeframe: Timeframe): Promise<Candle[]> => {
+  // Normalize symbol for Binance Public API (e.g., EURUSD -> EURUSDT for approximation, or BTCUSD -> BTCUSDT)
+  // This uses Binance public data which is free and reliable for "Real" data analysis.
+  let pair = symbol.toUpperCase().replace('/', '').replace('-', '').trim();
+  
+  // Basic mapping for common forex to stablecoin pairs if user types forex
+  if (!pair.endsWith('USDT') && !pair.endsWith('BTC') && !pair.endsWith('ETH') && !pair.endsWith('BNB')) {
+      pair = pair + 'USDT'; 
+  }
+
+  const interval = mapTimeframeToBinance(timeframe);
+  const limit = 200; // Get enough data for indicators
+
+  try {
+    const response = await fetch(`https://api.binance.com/api/v3/klines?symbol=${pair}&interval=${interval}&limit=${limit}`);
+    
+    if (!response.ok) {
+        throw new Error(`Market data not available for ${pair}. Try a crypto pair like BTCUSDT.`);
+    }
+
+    const rawData = await response.json();
+
+    // Binance format: [Open time, Open, High, Low, Close, Volume, Close time, ...]
+    return rawData.map((d: any) => {
+        const date = new Date(d[0]);
+        return {
+            time: date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }), // Simple time label
+            open: parseFloat(d[1]),
+            high: parseFloat(d[2]),
+            low: parseFloat(d[3]),
+            close: parseFloat(d[4]),
+            volume: parseFloat(d[5])
+        };
+    });
+
+  } catch (e: any) {
+    console.warn("Failed to fetch real data:", e);
+    throw new Error(`Could not fetch real market data for ${symbol}. Please ensure it is a valid pair (e.g., BTCUSDT, ETHUSDT).`);
+  }
 };
 
 // Calculate Simple Moving Average
@@ -347,14 +373,13 @@ export const generateTradingBot = async (config: StrategyConfig): Promise<Genera
   }
 };
 
-// 3. Backtest Simulation
+// 3. Backtest Simulation (NOW USING REAL DATA)
 export const runBacktestSimulation = async (config: StrategyConfig): Promise<BacktestResult> => {
-  // 1. Generate Data (More data for valid indicators)
-  const totalCandles = 150;
-  const analysisWindow = 60;
-  const candles = generateSyntheticData(config.symbol, totalCandles); 
+  // 1. Fetch REAL Data
+  const candles = await fetchRealMarketData(config.symbol, config.timeframe);
+  const analysisWindow = Math.min(candles.length, 100); 
 
-  // 2. Calculate Indicators using updated config
+  // 2. Calculate Indicators using REAL data
   const rsiValues = calculateRSI(candles, config.indicators.rsiPeriod);
   const maValues = config.indicators.maType === 'SMA' 
       ? calculateSMA(candles, config.indicators.maPeriod) 
@@ -376,12 +401,12 @@ export const runBacktestSimulation = async (config: StrategyConfig): Promise<Bac
         ? `MACD:${mVal} Sig:${sVal}` 
         : 'MACD:N/A';
 
-      return `Idx:${i} T:${c.time} Close:${c.close} High:${c.high} Low:${c.low} ${rsi} ${ma} ${macdStr}`;
+      return `Idx:${i} Time:${c.time} Close:${c.close} High:${c.high} Low:${c.low} ${rsi} ${ma} ${macdStr}`;
   }).join('\n');
 
-  // 4. Ask AI to Simulate Trades with explicit parameters
+  // 4. Ask AI to Evaluate Trades on REAL Data
   const prompt = `
-    Act as a high-precision trading backtesting engine.
+    Act as a high-precision trading backtesting engine evaluating REAL HISTORICAL DATA.
     
     **Strategy**: ${config.description}
     
@@ -394,16 +419,15 @@ export const runBacktestSimulation = async (config: StrategyConfig): Promise<Bac
     - MA: ${config.indicators.maPeriod} (${config.indicators.maType})
     - MACD: ${config.indicators.macdFast}/${config.indicators.macdSlow}/${config.indicators.macdSignal}
     
-    **IMPORTANT**: Use the above Indicator Parameters and Risk Settings strictly, even if they conflict with the Strategy text.
-    
-    **Market Data (Last ${analysisWindow} periods with pre-calculated indicators)**:
+    **Real Market Data (Last ${analysisWindow} candles)**:
     ${simplifiedData}
     
     **Task**:
-    Simulate the execution of this strategy on the provided data points.
-    1. Identify entry points (Buy/Sell) based on the logic and the pre-calculated indicator values.
-    2. Determine exit points based on TP/SL or Strategy Exit logic.
-    3. Calculate profit/loss in pips.
+    Strictly evaluate where trades would have triggered on this REAL price history.
+    1. Scan the data row by row.
+    2. Identify entry points (Buy/Sell) based *only* on the logic and the indicator values provided.
+    3. Determine exit points based on TP/SL or Strategy Exit logic relative to the High/Low of subsequent candles.
+    4. Calculate profit/loss in pips.
     
     **Output JSON**:
     Return a JSON object with:
@@ -422,7 +446,7 @@ export const runBacktestSimulation = async (config: StrategyConfig): Promise<Bac
       model: MODEL_ID,
       contents: prompt,
       config: {
-        thinkingConfig: { thinkingBudget: 8192 }, // Lower budget for faster simulation
+        thinkingConfig: { thinkingBudget: 8192 },
         responseMimeType: "application/json",
         responseSchema: {
             type: Type.OBJECT,
@@ -461,10 +485,10 @@ export const runBacktestSimulation = async (config: StrategyConfig): Promise<Bac
     let balance = 10000;
     const equityCurve = [{ time: 'Start', balance }];
     
-    // Map trades to the timeline roughly
+    // Map trades to the timeline
     const trades: TradeEvent[] = (simulation.trades || []).map((t: any, i: number) => {
        balance += t.profit * 10; // Simplified lot sizing effect
-       const exitTime = visibleCandles[t.exitIndex]?.time || 'End';
+       const exitTime = visibleCandles[t.exitIndex]?.time || 'Open';
        equityCurve.push({ time: exitTime, balance });
        return { ...t, id: `trade-${i}` };
     });
@@ -483,7 +507,7 @@ export const runBacktestSimulation = async (config: StrategyConfig): Promise<Bac
     };
 
   } catch (error) {
-    handleGenAIError(error, "Backtest Simulation");
+    handleGenAIError(error, "Real-Data Backtest");
   }
 };
 

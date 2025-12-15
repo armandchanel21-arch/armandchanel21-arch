@@ -1,9 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Platform, Timeframe, StrategyConfig, IndicatorSettings } from '../types';
-import { Bot, Sliders, X, Save, FolderOpen, Trash2, Check, Camera, Activity, Zap, Settings2, Code, Play } from 'lucide-react';
+import { Bot, Sliders, X, Save, FolderOpen, Trash2, Check, Camera, Activity, Zap, Settings2, Code, Play, GripVertical, Plus } from 'lucide-react';
 import { analyzeChart } from '../services/geminiService';
 
-interface StrategyFormProps {
+interface StrategyBuilderProps {
   onSubmit: (config: StrategyConfig) => void;
   onBacktest: (config: StrategyConfig) => void;
   isGenerating: boolean;
@@ -40,7 +40,7 @@ const ConfigInput: React.FC<{ label: string; children: React.ReactNode }> = ({ l
   </div>
 );
 
-const StrategyForm: React.FC<StrategyFormProps> = ({ onSubmit, onBacktest, isGenerating, onConfigChange }) => {
+const StrategyBuilder: React.FC<StrategyBuilderProps> = ({ onSubmit, onBacktest, isGenerating, onConfigChange }) => {
   const [config, setConfig] = useState<StrategyConfig>({
     name: 'Alpha_Bot_v1',
     category: 'Trend Following',
@@ -183,15 +183,15 @@ const StrategyForm: React.FC<StrategyFormProps> = ({ onSubmit, onBacktest, isGen
       {/* Header */}
       <div className="bg-gaming-950 border-b border-gaming-800 p-3 flex justify-between items-center font-bold uppercase tracking-wider text-sm shrink-0">
          <div className="flex items-center gap-2 text-white">
-            <Bot size={16} className="text-gaming-accent" />
+            <Sliders size={16} className="text-gaming-accent" />
             <span>Strategy Builder</span>
          </div>
-         <span className="bg-gaming-800 px-2 py-0.5 rounded text-[9px] text-gaming-500 border border-gaming-700">CONFIG PANEL</span>
+         <span className="bg-gaming-800 px-2 py-0.5 rounded text-[9px] text-gaming-500 border border-gaming-700">PRO MODE</span>
       </div>
 
       <div className="flex-1 overflow-y-auto p-3 space-y-4 custom-scrollbar">
         
-        {/* Top Actions */}
+        {/* Name & Load/Save */}
         <div className="flex justify-between items-center bg-gaming-800 p-2 rounded border border-gaming-700">
             <input
               type="text"
@@ -203,7 +203,7 @@ const StrategyForm: React.FC<StrategyFormProps> = ({ onSubmit, onBacktest, isGen
             />
             <div className="flex gap-1 shrink-0">
                 <div className="relative">
-                    <button type="button" onClick={() => setShowLoadMenu(!showLoadMenu)} className="p-1.5 hover:bg-gaming-700 rounded text-gaming-500 hover:text-white transition-colors" title="Load Strategy">
+                    <button type="button" onClick={() => setShowLoadMenu(!showLoadMenu)} className="p-1.5 hover:bg-gaming-700 rounded text-gaming-500 hover:text-white transition-colors" title="Load">
                         <FolderOpen size={14} />
                     </button>
                     {showLoadMenu && (
@@ -221,13 +221,13 @@ const StrategyForm: React.FC<StrategyFormProps> = ({ onSubmit, onBacktest, isGen
                         </div>
                     )}
                 </div>
-                <button type="button" onClick={handleSaveStrategy} className={`p-1.5 hover:bg-gaming-700 rounded transition-colors ${saveFeedback ? 'text-gaming-accent' : 'text-gaming-500 hover:text-white'}`} title="Save Strategy">
+                <button type="button" onClick={handleSaveStrategy} className={`p-1.5 hover:bg-gaming-700 rounded transition-colors ${saveFeedback ? 'text-gaming-accent' : 'text-gaming-500 hover:text-white'}`} title="Save">
                     {saveFeedback ? <Check size={14} /> : <Save size={14} />}
                 </button>
             </div>
         </div>
 
-        {/* Market Info */}
+        {/* Assets */}
         <SectionHeader title="Asset Configuration" />
         <div className="grid grid-cols-2 gap-2">
             <ConfigInput label="Target Symbol">
@@ -239,7 +239,7 @@ const StrategyForm: React.FC<StrategyFormProps> = ({ onSubmit, onBacktest, isGen
                   className="w-full bg-transparent border-none text-white font-mono text-xs focus:ring-0 p-0 uppercase"
                 />
             </ConfigInput>
-            <ConfigInput label="Chart Timeframe">
+            <ConfigInput label="Timeframe">
                 <select
                     name="timeframe"
                     value={config.timeframe}
@@ -251,75 +251,77 @@ const StrategyForm: React.FC<StrategyFormProps> = ({ onSubmit, onBacktest, isGen
             </ConfigInput>
         </div>
 
-        <SectionHeader title="Trading Logic" />
-        <ConfigInput label="Strategy Type">
-             <select
-                  name="category"
-                  value={config.category}
-                  onChange={handleChange}
-                  className={`w-full bg-transparent border-none text-white font-bold text-xs focus:ring-0 p-0 ${autoTuned ? 'text-gaming-accent' : ''}`}
-                >
-                  {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-             </select>
-        </ConfigInput>
-
-        {/* AI Auto Tune */}
-        <div className="mt-2">
+        {/* AI Logic Builder */}
+        <SectionHeader title="Logic Matrix" />
+        <div className="bg-gaming-800 rounded border border-gaming-700 p-2 space-y-2">
+             <div className="flex items-center justify-between">
+                <label className="text-[9px] font-bold text-gaming-500 uppercase">Strategy Class</label>
+                <select
+                    name="category"
+                    value={config.category}
+                    onChange={handleChange}
+                    className={`bg-gaming-900 border border-gaming-600 rounded text-xs text-white px-2 py-0.5 outline-none focus:border-gaming-accent ${autoTuned ? 'text-gaming-accent' : ''}`}
+                    >
+                    {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+             </div>
+             
+             {/* Text Area (Simulating Logic Blocks) */}
+             <div>
+                <textarea
+                    name="description"
+                    rows={4}
+                    value={config.description}
+                    onChange={handleChange}
+                    className={`w-full bg-gaming-900 border border-gaming-600 rounded p-2 text-gray-300 text-xs mt-1 focus:border-gaming-accent focus:ring-0 outline-none resize-none font-mono leading-relaxed ${autoTuned ? 'border-gaming-accent' : ''}`}
+                    placeholder="// Describe logic..."
+                />
+             </div>
+             
+             {/* AI Upload Button */}
              {!imagePreview ? (
                 <button 
                     type="button" 
                     onClick={() => fileInputRef.current?.click()}
-                    className="w-full flex items-center justify-center gap-2 py-3 border border-dashed border-gaming-700 hover:border-gaming-500 rounded bg-gaming-800/50 text-xs text-gaming-500 hover:text-white transition-all group"
+                    className="w-full flex items-center justify-center gap-2 py-2 border border-dashed border-gaming-600 rounded hover:border-gaming-400 text-[10px] text-gaming-500 hover:text-white transition-all bg-gaming-900/50"
                 >
-                    <Camera size={14} className="group-hover:text-gaming-accent" />
-                    <span>Upload Chart for AI Analysis</span>
+                    <Camera size={12} />
+                    <span>Import Chart Structure (AI)</span>
                 </button>
              ) : (
-                <div className="relative rounded overflow-hidden border border-gaming-600 h-20 bg-black">
-                    <img src={imagePreview} className="w-full h-full object-cover opacity-50" alt="Target" />
-                    <div className="absolute inset-0 flex items-center justify-center gap-2">
-                        <button type="button" onClick={handleAnalyzeChart} disabled={isAnalyzing} className="bg-gaming-accent text-gaming-950 px-3 py-1.5 rounded font-bold text-xs flex items-center gap-1 hover:brightness-110 shadow-lg">
-                            {isAnalyzing ? <div className="animate-spin h-3 w-3 border-2 border-black rounded-full border-t-transparent"></div> : <Zap size={14} />}
-                            ANALYZE
+                <div className="relative rounded overflow-hidden border border-gaming-600 h-16 bg-black group">
+                    <img src={imagePreview} className="w-full h-full object-cover opacity-60" alt="Target" />
+                    <div className="absolute inset-0 flex items-center justify-center gap-2 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button type="button" onClick={handleAnalyzeChart} disabled={isAnalyzing} className="bg-gaming-accent text-gaming-950 px-2 py-1 rounded font-bold text-[10px] flex items-center gap-1">
+                            {isAnalyzing ? <span className="animate-spin">⌛</span> : <Zap size={10} />} ANALYZE
                         </button>
-                        <button type="button" onClick={() => { setImagePreview(null); setRawImage(null); }} className="bg-gaming-800 p-1.5 rounded text-white hover:text-danger border border-gaming-700">
-                            <X size={14} />
+                        <button type="button" onClick={() => { setImagePreview(null); setRawImage(null); }} className="bg-gaming-800 p-1 rounded text-white">
+                            <X size={12} />
                         </button>
                     </div>
                 </div>
              )}
              <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
-             {analysisError && <div className="text-[10px] text-danger mt-1">{analysisError}</div>}
+             {analysisError && <div className="text-[9px] text-danger">{analysisError}</div>}
         </div>
 
-        <div className="mt-2">
-            <label className="text-[9px] font-bold text-gaming-500 uppercase tracking-wide">Entry/Exit Rules</label>
-            <textarea
-                name="description"
-                rows={4}
-                value={config.description}
-                onChange={handleChange}
-                className={`w-full bg-gaming-800 border border-gaming-700 rounded p-2 text-gray-300 text-xs mt-1 focus:border-gaming-accent focus:ring-0 outline-none resize-none ${autoTuned ? 'border-gaming-accent' : ''}`}
-            />
-        </div>
-
-        <SectionHeader title="Risk Management" />
+        <SectionHeader title="Risk Profile" />
         <div className="grid grid-cols-3 gap-2">
              <ConfigInput label="Lot Size">
                  <input type="number" name="lotSize" step="0.01" value={config.lotSize} onChange={handleChange} className="w-full bg-transparent text-white font-bold text-sm focus:ring-0 border-none p-0" />
              </ConfigInput>
-             <ConfigInput label="Stop Loss (Pips)">
+             <ConfigInput label="SL (Pips)">
                  <input type="number" name="stopLoss" value={config.stopLoss} onChange={handleChange} className="w-full bg-transparent text-danger font-bold text-sm focus:ring-0 border-none p-0" />
              </ConfigInput>
-             <ConfigInput label="Take Profit (Pips)">
+             <ConfigInput label="TP (Pips)">
                  <input type="number" name="takeProfit" value={config.takeProfit} onChange={handleChange} className="w-full bg-transparent text-gaming-accent font-bold text-sm focus:ring-0 border-none p-0" />
              </ConfigInput>
         </div>
 
-        {/* Indicators Accordion (Simplified) */}
+        {/* Indicators */}
         <details className="group bg-gaming-800 border border-gaming-700 rounded overflow-hidden">
-            <summary className="flex items-center justify-between p-2 cursor-pointer text-xs font-bold text-gaming-400 group-open:text-white hover:bg-gaming-700">
-                <span>INDICATOR PARAMETERS</span>
+            <summary className="flex items-center justify-between p-2 cursor-pointer text-xs font-bold text-gaming-400 group-open:text-white hover:bg-gaming-700 select-none">
+                <span>TECHNICAL INDICATORS</span>
                 <Sliders size={12} />
             </summary>
             <div className="p-2 space-y-2 border-t border-gaming-700 bg-gaming-900/50">
@@ -339,10 +341,10 @@ const StrategyForm: React.FC<StrategyFormProps> = ({ onSubmit, onBacktest, isGen
         </details>
       </div>
 
-      {/* Footer / Place Bet */}
+      {/* Footer */}
       <div className="p-3 bg-gaming-950 border-t border-gaming-700 shrink-0 space-y-2">
          <div className="flex justify-between text-[10px] text-gaming-500 mb-1 font-bold uppercase tracking-wider">
-             <span>Projected R:R</span>
+             <span>Reward Ratio</span>
              <span className="text-white font-mono">1:{(config.takeProfit / config.stopLoss).toFixed(1)}</span>
          </div>
          
@@ -354,7 +356,7 @@ const StrategyForm: React.FC<StrategyFormProps> = ({ onSubmit, onBacktest, isGen
                 className="flex-1 bg-gaming-800 hover:bg-gaming-700 text-white font-bold py-3 rounded text-xs border border-gaming-700 uppercase tracking-wide flex items-center justify-center gap-1 disabled:opacity-50 transition-colors"
             >
                 <Play size={14} className="text-gaming-accent" /> 
-                <span className="mt-0.5">Test</span>
+                <span className="mt-0.5">Simulate</span>
             </button>
             <button
                 type="button"
@@ -362,7 +364,7 @@ const StrategyForm: React.FC<StrategyFormProps> = ({ onSubmit, onBacktest, isGen
                 disabled={isGenerating || formInvalid}
                 className="flex-[2] bg-gaming-accent hover:bg-gaming-accentHover text-gaming-950 font-black py-3 rounded text-sm uppercase tracking-wider shadow-[0_0_15px_rgba(34,197,94,0.3)] hover:shadow-[0_0_20px_rgba(34,197,94,0.5)] transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:shadow-none"
             >
-                {isGenerating ? <div className="animate-spin h-4 w-4 border-2 border-black rounded-full border-t-transparent"></div> : <><Code size={16} strokeWidth={3} /> GENERATE BOT</>}
+                {isGenerating ? <div className="animate-spin h-4 w-4 border-2 border-black rounded-full border-t-transparent"></div> : <><Code size={16} strokeWidth={3} /> EXPORT BOT</>}
             </button>
          </div>
       </div>
@@ -371,4 +373,4 @@ const StrategyForm: React.FC<StrategyFormProps> = ({ onSubmit, onBacktest, isGen
   );
 };
 
-export default StrategyForm;
+export default StrategyBuilder;

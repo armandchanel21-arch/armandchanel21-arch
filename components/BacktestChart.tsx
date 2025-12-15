@@ -20,14 +20,15 @@ interface BacktestChartProps {
   onClose: () => void;
 }
 
-const StatCard = ({ label, value, icon: Icon, color }: any) => (
-  <div className="bg-trade-800 border border-trade-700 p-3 rounded-lg flex items-center gap-3">
-    <div className={`p-2 rounded-full bg-opacity-10 ${color}`}>
-      <Icon size={18} className={color.replace('bg-', 'text-')} />
+// Gaming Style Stat Card (Adapted for Trading)
+const StatCard = ({ label, value, icon: Icon, colorClass }: any) => (
+  <div className="bg-gaming-800 border border-gaming-700 p-3 rounded flex items-center gap-3 shadow-sm min-w-[140px]">
+    <div className={`p-2 rounded bg-gaming-950 border border-gaming-700 ${colorClass}`}>
+      <Icon size={16} />
     </div>
     <div>
-      <div className="text-xs text-trade-500 uppercase font-bold">{label}</div>
-      <div className="text-lg font-mono text-gray-200">{value}</div>
+      <div className="text-[10px] text-gaming-500 uppercase font-black tracking-wide">{label}</div>
+      <div className="text-lg font-black text-white leading-tight font-mono">{value}</div>
     </div>
   </div>
 );
@@ -36,34 +37,20 @@ const CustomTooltip = ({ active, payload, label }: any) => {
   if (active && payload && payload.length) {
     const data = payload[0].payload;
     return (
-      <div className="bg-trade-800 border border-trade-700 p-3 rounded shadow-xl text-xs z-50">
-        <div className="font-bold text-gray-300 mb-1">{label}</div>
+      <div className="bg-gaming-950 border border-gaming-700 p-3 rounded shadow-xl text-xs z-50">
+        <div className="font-bold text-gaming-400 mb-1 font-mono">{label}</div>
         <div className="flex justify-between gap-4 mb-1">
-            <span className="text-gray-500">Close:</span>
-            <span className="text-trade-accent font-mono">{data.close}</span>
+            <span className="text-gaming-500">Close</span>
+            <span className="text-white font-mono font-bold">{data.close}</span>
         </div>
         {data.tradeInfo && (
-          <div className={`mt-2 border-t border-trade-700 pt-2 ${data.tradeInfo.type === 'BUY' ? 'text-green-400' : 'text-red-400'}`}>
-            <div className="font-bold flex items-center gap-1">
-                {data.tradeInfo.type === 'BUY' ? <ArrowUp size={12}/> : <ArrowDown size={12}/>}
-                {data.tradeInfo.type} ENTRY
+          <div className={`mt-2 border-t border-gaming-800 pt-2 ${data.tradeInfo.type === 'BUY' ? 'text-gaming-accent' : 'text-danger'}`}>
+            <div className="font-black flex items-center gap-1">
+                {data.tradeInfo.type === 'BUY' ? <ArrowUp size={12} strokeWidth={3}/> : <ArrowDown size={12} strokeWidth={3}/>}
+                {data.tradeInfo.type} SIGNAL
             </div>
-            <div className="flex justify-between gap-4 mt-1 text-gray-400">
-                <span>Price:</span>
-                <span className="font-mono text-gray-300">{data.tradeInfo.entryPrice}</span>
-            </div>
-          </div>
-        )}
-         {data.exitInfo && (
-          <div className={`mt-2 border-t border-trade-700 pt-2 ${data.exitInfo.profit > 0 ? 'text-green-400' : 'text-red-400'}`}>
-            <div className="font-bold">EXIT {data.exitInfo.profit > 0 ? '(WIN)' : '(LOSS)'}</div>
-            <div className="flex justify-between gap-4 mt-1 text-gray-400">
-                <span>Price:</span>
-                <span className="font-mono text-gray-300">{data.exitInfo.exitPrice}</span>
-            </div>
-            <div className="flex justify-between gap-4 text-gray-400">
-                <span>Profit:</span>
-                <span className="font-mono">{data.exitInfo.profit.toFixed(1)} pips</span>
+            <div className="flex justify-between mt-1 text-[10px] text-gaming-500">
+                <span>Entry: {data.tradeInfo.entryPrice}</span>
             </div>
           </div>
         )}
@@ -90,61 +77,51 @@ const BacktestChart: React.FC<BacktestChartProps> = ({ result, onClose }) => {
   });
 
   return (
-    <div className="flex flex-col h-full bg-trade-950 animate-fade-in relative">
-      {/* Header Stats */}
-      <div className="h-20 border-b border-trade-700 bg-trade-900 px-6 flex items-center justify-between shrink-0">
-         <div className="flex gap-4">
-             <StatCard 
-               label="Net Profit" 
-               value={`$${metrics.netProfit.toFixed(2)}`} 
-               icon={DollarSign} 
-               color={metrics.netProfit >= 0 ? 'bg-green-500 text-green-500' : 'bg-red-500 text-red-500'} 
-             />
-             <StatCard 
-               label="Win Rate" 
-               value={`${metrics.winRate}%`} 
-               icon={Percent} 
-               color="bg-blue-500 text-blue-500" 
-             />
-             <StatCard 
-               label="Total Trades" 
-               value={metrics.totalTrades} 
-               icon={Activity} 
-               color="bg-purple-500 text-purple-500" 
-             />
-             <StatCard 
-               label="Profit Factor" 
-               value={metrics.profitFactor.toFixed(2)} 
-               icon={TrendingUp} 
-               color="bg-orange-500 text-orange-500" 
-             />
-         </div>
-         <button onClick={onClose} className="px-4 py-2 bg-trade-800 hover:bg-trade-700 border border-trade-600 rounded text-sm text-gray-300 transition-colors">
-            Close Simulation
-         </button>
+    <div className="flex flex-col h-full bg-gaming-950 animate-fade-in relative">
+      
+      {/* Stats Header */}
+      <div className="h-24 bg-gaming-900 border-b border-gaming-800 px-4 flex items-center gap-4 overflow-x-auto no-scrollbar shrink-0">
+         <StatCard 
+           label="Net Profit" 
+           value={`$${metrics.netProfit.toFixed(2)}`} 
+           icon={DollarSign} 
+           colorClass={metrics.netProfit >= 0 ? 'text-gaming-accent' : 'text-danger'} 
+         />
+         <StatCard 
+           label="Win Rate" 
+           value={`${metrics.winRate}%`} 
+           icon={Percent} 
+           colorClass="text-blue-400" 
+         />
+         <StatCard 
+           label="Total Trades" 
+           value={metrics.totalTrades} 
+           icon={Activity} 
+           colorClass="text-purple-400" 
+         />
+         <StatCard 
+           label="Profit Factor" 
+           value={metrics.profitFactor.toFixed(2)} 
+           icon={TrendingUp} 
+           colorClass="text-orange-400" 
+         />
       </div>
 
       <div className="flex-1 flex flex-col p-4 gap-4 overflow-hidden">
         
         {/* Main Price Chart */}
-        <div className="flex-[2] min-h-0 bg-trade-900 border border-trade-700 rounded-lg p-4 relative flex flex-col">
-            <h3 className="absolute top-4 left-4 text-xs font-bold text-trade-500 z-10 flex items-center gap-2">
-                PRICE ACTION SIMULATION
-                <span className="flex items-center gap-1 text-[10px] bg-trade-800 px-2 py-0.5 rounded border border-trade-700">
-                    <span className="w-2 h-2 rounded-full bg-green-500"></span> Buy
-                </span>
-                <span className="flex items-center gap-1 text-[10px] bg-trade-800 px-2 py-0.5 rounded border border-trade-700">
-                    <span className="w-2 h-2 rounded-full bg-red-500"></span> Sell
-                </span>
+        <div className="flex-[2] min-h-0 bg-gaming-900 border border-gaming-800 rounded p-4 relative flex flex-col">
+            <h3 className="absolute top-3 left-3 text-[10px] font-black text-gaming-500 z-10 flex items-center gap-2 uppercase tracking-widest bg-gaming-900/80 px-2 py-1 rounded">
+                Trade Execution Visualizer
             </h3>
             <div className="flex-1 w-full min-h-0 mt-4">
                 <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={chartData} margin={{ top: 20, right: 30, left: 10, bottom: 0 }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#2a2e39" />
-                        <XAxis dataKey="time" stroke="#434651" tick={{fontSize: 10}} />
-                        <YAxis domain={['auto', 'auto']} stroke="#434651" tick={{fontSize: 10}} />
+                        <CartesianGrid strokeDasharray="3 3" stroke="#2A2A2A" vertical={false} />
+                        <XAxis dataKey="time" stroke="#525252" tick={{fontSize: 9, fill: '#737373'}} axisLine={false} tickLine={false} />
+                        <YAxis domain={['auto', 'auto']} stroke="#525252" tick={{fontSize: 9, fill: '#737373'}} axisLine={false} tickLine={false} />
                         <Tooltip content={<CustomTooltip />} />
-                        <Line type="monotone" dataKey="close" stroke="#2962ff" strokeWidth={2} dot={false} activeDot={{ r: 4, fill: '#2962ff' }} />
+                        <Line type="monotone" dataKey="close" stroke="#3b82f6" strokeWidth={1.5} dot={false} activeDot={{ r: 4, fill: '#fff' }} />
                         
                         {/* Iterate trades to draw markers and lines */}
                         {trades.map((trade, i) => {
@@ -154,50 +131,32 @@ const BacktestChart: React.FC<BacktestChartProps> = ({ result, onClose }) => {
                             
                             return (
                                 <React.Fragment key={`trade-visual-${i}`}>
-                                    {/* Connection Line */}
                                     {entryTime && exitTime && (
                                         <ReferenceLine 
                                             segment={[
                                                 { x: entryTime, y: trade.entryPrice }, 
                                                 { x: exitTime, y: trade.exitPrice }
                                             ]} 
-                                            stroke={isWin ? '#00dc82' : '#f23645'} 
-                                            strokeDasharray="3 3" 
-                                            opacity={0.5}
+                                            stroke={isWin ? '#22c55e' : '#ef4444'} 
+                                            strokeDasharray="2 2" 
+                                            opacity={0.6}
                                             strokeWidth={1}
                                         />
                                     )}
-
-                                    {/* Entry Marker */}
                                     <ReferenceDot 
                                         x={entryTime} 
                                         y={trade.entryPrice} 
-                                        r={5} 
-                                        fill={trade.type === 'BUY' ? '#00dc82' : '#f23645'} 
-                                        stroke="#131722"
-                                        strokeWidth={2}
-                                        label={{ 
-                                            position: 'top', 
-                                            value: trade.type === 'BUY' ? 'B' : 'S', 
-                                            fill: trade.type === 'BUY' ? '#00dc82' : '#f23645',
-                                            fontSize: 10,
-                                            fontWeight: 'bold'
-                                        }}
+                                        r={3} 
+                                        fill={trade.type === 'BUY' ? '#22c55e' : '#ef4444'} 
+                                        stroke="#050505"
+                                        strokeWidth={1}
                                     />
-                                    
-                                    {/* Exit Marker */}
                                     {exitTime && (
                                     <ReferenceDot 
                                         x={exitTime} 
                                         y={trade.exitPrice} 
-                                        r={4} 
-                                        fill={isWin ? '#00dc82' : '#f23645'} 
-                                        stroke="none"
-                                        shape={(props: any) => (
-                                            <g transform={`translate(${props.cx},${props.cy})`}>
-                                                <rect x="-3" y="-3" width="6" height="6" transform="rotate(45)" fill={props.fill} stroke="#131722" strokeWidth={1} />
-                                            </g>
-                                        )}
+                                        r={2} 
+                                        fill="#ffffff" 
                                     />
                                     )}
                                 </React.Fragment>
@@ -209,26 +168,27 @@ const BacktestChart: React.FC<BacktestChartProps> = ({ result, onClose }) => {
         </div>
 
         {/* Equity Curve */}
-        <div className="flex-1 min-h-[150px] bg-trade-900 border border-trade-700 rounded-lg p-4 relative flex flex-col">
-             <h3 className="absolute top-4 left-4 text-xs font-bold text-trade-500 z-10">EQUITY CURVE</h3>
+        <div className="flex-1 min-h-[150px] bg-gaming-900 border border-gaming-800 rounded p-4 relative flex flex-col">
+             <h3 className="absolute top-3 left-3 text-[10px] font-black text-gaming-500 z-10 uppercase tracking-widest bg-gaming-900/80 px-2 py-1 rounded">Equity Curve</h3>
              <div className="flex-1 w-full min-h-0 mt-2">
                 <ResponsiveContainer width="100%" height="100%">
                     <AreaChart data={equityCurve} margin={{ top: 10, right: 30, left: 10, bottom: 0 }}>
                         <defs>
                             <linearGradient id="colorBalance" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor="#00dc82" stopOpacity={0.3}/>
-                            <stop offset="95%" stopColor="#00dc82" stopOpacity={0}/>
+                            <stop offset="5%" stopColor="#22c55e" stopOpacity={0.2}/>
+                            <stop offset="95%" stopColor="#22c55e" stopOpacity={0}/>
                             </linearGradient>
                         </defs>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#2a2e39" />
-                        <XAxis dataKey="time" stroke="#434651" tick={{fontSize: 10}} />
-                        <YAxis domain={['auto', 'auto']} stroke="#434651" tick={{fontSize: 10}} />
+                        <CartesianGrid strokeDasharray="3 3" stroke="#2A2A2A" vertical={false} />
+                        <XAxis dataKey="time" hide />
+                        <YAxis domain={['auto', 'auto']} stroke="#525252" tick={{fontSize: 9, fill: '#737373'}} axisLine={false} tickLine={false} />
                         <Tooltip 
-                            contentStyle={{backgroundColor: '#1e222d', borderColor: '#2a2e39'}}
+                            contentStyle={{backgroundColor: '#050505', borderColor: '#2A2A2A'}}
+                            itemStyle={{color: '#22c55e', fontWeight: 'bold'}}
                             formatter={(value: any) => [`$${Number(value).toFixed(2)}`, 'Balance']}
-                            labelStyle={{color: '#8b9bb4'}}
+                            labelStyle={{color: '#737373'}}
                         />
-                        <Area type="monotone" dataKey="balance" stroke="#00dc82" strokeWidth={2} fillOpacity={1} fill="url(#colorBalance)" />
+                        <Area type="monotone" dataKey="balance" stroke="#22c55e" strokeWidth={2} fillOpacity={1} fill="url(#colorBalance)" />
                     </AreaChart>
                 </ResponsiveContainer>
             </div>

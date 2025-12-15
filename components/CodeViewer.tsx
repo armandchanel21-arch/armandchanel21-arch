@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { GeneratedBot } from '../types';
 import { Copy, Download, Check, FileCode } from 'lucide-react';
 
@@ -73,17 +73,17 @@ const CodeViewer: React.FC<CodeViewerProps> = ({ bot, botName, ext }) => {
 
   return (
     <div className="flex h-full flex-col font-mono text-sm">
-      <div className="flex border-b border-trade-700 bg-trade-800">
-          <div className="px-4 py-2 border-r border-trade-700 bg-[#0d1117] text-white flex items-center gap-2 text-xs border-t-2 border-t-trade-accent">
-              <FileCode size={12} className="text-trade-accent" />
+      <div className="flex border-b border-gaming-700 bg-gaming-800">
+          <div className="px-4 py-2 border-r border-gaming-700 bg-[#0d1117] text-white flex items-center gap-2 text-xs border-t-2 border-t-gaming-accent">
+              <FileCode size={12} className="text-gaming-accent" />
               {botName}.{ext}
           </div>
           <div className="flex-1"></div>
           <div className="flex items-center gap-1 px-2">
-              <button onClick={handleCopy} className="p-1.5 text-trade-500 hover:text-white transition-colors" title="Copy">
+              <button onClick={handleCopy} className="p-1.5 text-gaming-500 hover:text-white transition-colors" title="Copy">
                   {copied ? <Check size={14} className="text-green-400" /> : <Copy size={14} />}
               </button>
-              <button onClick={handleDownload} className="p-1.5 text-trade-500 hover:text-white transition-colors" title="Download">
+              <button onClick={handleDownload} className="p-1.5 text-gaming-500 hover:text-white transition-colors" title="Download">
                   <Download size={14} />
               </button>
           </div>
@@ -91,7 +91,7 @@ const CodeViewer: React.FC<CodeViewerProps> = ({ bot, botName, ext }) => {
 
       <div className="relative flex-1 bg-[#0d1117] overflow-hidden">
         {/* Line Numbers */}
-        <div className="absolute left-0 top-0 bottom-0 w-10 bg-[#0d1117] border-r border-trade-700 z-10 flex flex-col items-end py-4 pr-2 text-[#4b5563] text-xs leading-5 select-none overflow-hidden">
+        <div className="absolute left-0 top-0 bottom-0 w-10 bg-[#0d1117] border-r border-gaming-700 z-10 flex flex-col items-end py-4 pr-2 text-[#4b5563] text-xs leading-5 select-none overflow-hidden">
             {code.split('\n').map((_, i) => <div key={i} className="h-5">{i + 1}</div>)}
         </div>
 
