@@ -1,0 +1,13 @@
+armandchanel21-arch/
+├── index.html                 # Login screen
+├── dashboard.html             # Main app view
+├── css/
+│   └── styles.css             # Dark theme + Play.co.za aesthetic
+├── js/
+│   ├── app.js                 # Core logic: nav, tabs, demo mode
+│   ├── chart.js               # TradingView lightweight chart init
+│   ├── strategy-builder.js    # Drag-and-drop condition builder UI
+│   └── portfolio.js           # Fake P&L graph + trade history table
+├── assets/
+│   └── icons/                 # SVGs for navigation icons (home, bot, wallet)
+└── README.md                  ← I'll write this too – investor pitch ready.
