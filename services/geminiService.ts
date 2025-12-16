@@ -1,5 +1,5 @@
 import { GoogleGenAI, Type } from "@google/genai";
-import { StrategyConfig, GeneratedBot, BacktestResult, Candle, TradeEvent, Timeframe } from '../types';
+import { StrategyConfig, GeneratedBot, BacktestResult, Candle, TradeEvent, ChatMessage, Timeframe } from '../types';
 
 // Initialize the client strictly according to guidelines
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
@@ -276,16 +276,28 @@ export const runBacktestSimulation = async (config: StrategyConfig): Promise<Bac
       config: { responseMimeType: "application/json", thinkingConfig: { thinkingBudget: 8192 } }
     });
     const sim = JSON.parse(extractJSON(response.text || "{}"));
+    
     // Hydrate trades
     const trades: TradeEvent[] = (sim.trades || []).map((t: any, i: number) => ({
        ...t, id: `t-${i}`, entryPrice: t.entryPrice || 0, exitPrice: t.exitPrice || 0, profit: t.profit || 0
     }));
+    
     // Hydrate equity curve
     let balance = 10000;
     const equityCurve = trades.map(t => { balance += t.profit * 10; return { time: `Trade ${t.id}`, balance }; });
     if (equityCurve.length === 0) equityCurve.push({ time: 'Start', balance: 10000 });
 
-    return { trades, metrics: sim.metrics || { winRate: 0, netProfit: 0, profitFactor: 0, maxDrawdown: 0, totalTrades: 0 }, data: candles.slice(-50), equityCurve };
+    // Robust Metric Handling: Ensure numbers are actually numbers and defaults exist
+    const rawMetrics = sim.metrics || {};
+    const metrics = {
+        winRate: Number(rawMetrics.winRate) || 0,
+        netProfit: Number(rawMetrics.netProfit) || 0,
+        profitFactor: Number(rawMetrics.profitFactor) || 0,
+        maxDrawdown: Number(rawMetrics.maxDrawdown) || 0,
+        totalTrades: trades.length
+    };
+
+    return { trades, metrics, data: candles.slice(-50), equityCurve };
   } catch (error) {
     handleGenAIError(error, "Backtest");
   }

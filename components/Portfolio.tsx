@@ -67,17 +67,25 @@ const StatCard = ({ label, value, icon: Icon, colorClass, sub }: any) => (
 const Portfolio: React.FC<PortfolioProps> = ({ result }) => {
   // Use real result or fallback to mock data
   const { equityCurve, metrics, recentTrades, isDemo } = useMemo(() => {
-    if (result) {
+    if (result && result.metrics) {
       return {
-        equityCurve: result.equityCurve,
+        equityCurve: result.equityCurve || [],
         metrics: result.metrics,
-        recentTrades: [...result.trades].reverse().slice(0, 50),
+        recentTrades: [...(result.trades || [])].reverse().slice(0, 50),
         isDemo: false
       };
     }
     const mock = generateMockData();
     return { ...mock, isDemo: true };
   }, [result]);
+
+  // Safe Metric Accessors
+  const netProfit = Number(metrics.netProfit) || 0;
+  const winRate = Number(metrics.winRate) || 0;
+  const totalTrades = Number(metrics.totalTrades) || 0;
+  const maxDrawdown = Number(metrics.maxDrawdown) || 0;
+
+  const currentBalance = equityCurve.length > 0 ? equityCurve[equityCurve.length - 1].balance : 0;
 
   return (
     <div className="flex flex-col h-full bg-gaming-950 animate-fade-in relative overflow-hidden">
@@ -95,7 +103,7 @@ const Portfolio: React.FC<PortfolioProps> = ({ result }) => {
         <div className="text-right">
              <div className="text-[10px] text-gaming-500 uppercase font-bold">Total Balance</div>
              <div className="text-3xl font-black text-white font-mono tracking-tight">
-                ${equityCurve[equityCurve.length - 1].balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                ${currentBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
              </div>
         </div>
       </div>
@@ -106,28 +114,28 @@ const Portfolio: React.FC<PortfolioProps> = ({ result }) => {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <StatCard 
             label="Net Profit" 
-            value={`$${metrics.netProfit.toFixed(2)}`} 
+            value={`$${netProfit.toFixed(2)}`} 
             icon={DollarSign} 
-            colorClass={metrics.netProfit >= 0 ? 'text-gaming-accent' : 'text-danger'}
+            colorClass={netProfit >= 0 ? 'text-gaming-accent' : 'text-danger'}
             sub={isDemo ? "+12.5% this month" : "Realized P&L"} 
             />
             <StatCard 
             label="Win Rate" 
-            value={`${metrics.winRate.toFixed(1)}%`} 
+            value={`${winRate.toFixed(1)}%`} 
             icon={Percent} 
             colorClass="text-blue-400"
             sub="High Probability"
             />
             <StatCard 
             label="Total Trades" 
-            value={metrics.totalTrades} 
+            value={totalTrades} 
             icon={Activity} 
             colorClass="text-purple-400"
             sub=" executed orders"
             />
             <StatCard 
             label="Drawdown" 
-            value={`${metrics.maxDrawdown.toFixed(2)}%`} 
+            value={`${maxDrawdown.toFixed(2)}%`} 
             icon={TrendingDown} 
             colorClass="text-orange-400"
             sub="Max Risk Exposure" 
@@ -221,10 +229,10 @@ const Portfolio: React.FC<PortfolioProps> = ({ result }) => {
                                           {trade.type}
                                       </span>
                                   </td>
-                                  <td className="p-3 font-mono text-gray-300">{trade.entryPrice.toFixed(2)}</td>
-                                  <td className="p-3 font-mono text-gray-300">{trade.exitPrice.toFixed(2)}</td>
+                                  <td className="p-3 font-mono text-gray-300">{Number(trade.entryPrice).toFixed(2)}</td>
+                                  <td className="p-3 font-mono text-gray-300">{Number(trade.exitPrice).toFixed(2)}</td>
                                   <td className={`p-3 text-right font-mono font-bold ${trade.profit >= 0 ? 'text-gaming-accent' : 'text-danger'}`}>
-                                      {trade.profit >= 0 ? '+' : ''}{trade.profit.toFixed(2)}
+                                      {trade.profit >= 0 ? '+' : ''}{Number(trade.profit).toFixed(2)}
                                   </td>
                                   <td className="p-3 text-right">
                                       <span className="px-2 py-1 rounded-full bg-gaming-900 border border-gaming-700 text-[9px] text-gaming-500 uppercase font-bold">Closed</span>

@@ -11,6 +11,14 @@
     <link rel="manifest" href="/manifest.json" />
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
+      // Polyfill process.env for client-side libraries
+      window.process = {
+        env: {
+          NODE_ENV: 'development',
+          API_KEY: '' // This will be injected by the environment or assumed present
+        }
+      };
+      
       tailwind.config = {
         theme: {
           extend: {

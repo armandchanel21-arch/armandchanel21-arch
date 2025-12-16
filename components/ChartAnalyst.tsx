@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Upload, Zap, Image as ImageIcon, Loader2, Check, ScanLine, ArrowUpCircle, ArrowDownCircle, AlertOctagon } from 'lucide-react';
+import { Upload, Zap, Image as ImageIcon, Loader2, Check, ScanLine, ArrowUpCircle, ArrowDownCircle, AlertOctagon, Info } from 'lucide-react';
 import { analyzeChart } from '../services/geminiService';
 import { StrategyConfig } from '../types';
 
@@ -38,10 +38,11 @@ const ChartAnalyst: React.FC<ChartAnalystProps> = ({ onAnalysisComplete, onError
   const runAnalysis = async () => {
     if (!rawImage) return;
     setIsAnalyzing(true);
+    setResult(null);
     try {
       const analysis = await analyzeChart(rawImage, mimeType);
       setResult(analysis);
-      onAnalysisComplete(analysis); 
+      // We don't automatically navigate away, allowing user to see the result first
     } catch (err: any) {
       console.error("Analysis Error:", err);
       onError(err.message || "Analysis failed. Please try a clearer image.");
@@ -50,33 +51,48 @@ const ChartAnalyst: React.FC<ChartAnalystProps> = ({ onAnalysisComplete, onError
     }
   };
 
-  const SignalBadge = ({ signal, confidence }: { signal: string, confidence: number }) => {
-      let color = 'text-gray-400';
-      let bg = 'bg-gray-900';
-      let icon = <AlertOctagon />;
+  const handleUseStrategy = () => {
+      if (result) {
+          onAnalysisComplete(result);
+      }
+  };
+
+  const SignalBadge = ({ signal, confidence }: { signal?: string, confidence?: number }) => {
+      if (!signal) return null;
       
-      if (signal.includes('BUY')) {
+      const isBuy = signal.includes('BUY');
+      const isSell = signal.includes('SELL');
+      const isNeutral = signal.includes('NEUTRAL');
+
+      let color = 'text-gray-400';
+      let bg = 'bg-gray-900 border-gray-700';
+      let icon = <AlertOctagon />;
+      let text = "NEUTRAL";
+      
+      if (isBuy) {
           color = 'text-gaming-accent';
           bg = 'bg-gaming-accent/10 border-gaming-accent';
           icon = <ArrowUpCircle size={32} className="animate-bounce" />;
-      } else if (signal.includes('SELL')) {
+          text = signal.replace('_', ' ');
+      } else if (isSell) {
           color = 'text-danger';
           bg = 'bg-danger/10 border-danger';
           icon = <ArrowDownCircle size={32} className="animate-bounce" />;
+          text = signal.replace('_', ' ');
       }
 
       return (
-          <div className={`p-4 rounded-xl border-2 ${bg} flex items-center justify-between mb-4`}>
-              <div className="flex items-center gap-3">
+          <div className={`p-6 rounded-xl border-2 ${bg} flex items-center justify-between mb-6 shadow-lg`}>
+              <div className="flex items-center gap-4">
                   <div className={color}>{icon}</div>
                   <div>
-                      <div className={`text-lg font-black ${color}`}>{signal.replace('_', ' ')}</div>
-                      <div className="text-xs text-gaming-500 font-bold uppercase tracking-wider">AI Signal Confidence</div>
+                      <div className={`text-2xl font-black ${color} tracking-tight`}>{text}</div>
+                      <div className="text-xs text-gaming-500 font-bold uppercase tracking-wider">AI Recommendation</div>
                   </div>
               </div>
               <div className="text-right">
-                  <div className="text-2xl font-black text-white">{confidence}%</div>
-                  <div className="text-[10px] text-gaming-500">Probability</div>
+                  <div className="text-3xl font-black text-white">{confidence || 0}%</div>
+                  <div className="text-[10px] text-gaming-500 uppercase font-bold">Confidence</div>
               </div>
           </div>
       );
@@ -84,7 +100,7 @@ const ChartAnalyst: React.FC<ChartAnalystProps> = ({ onAnalysisComplete, onError
 
   return (
     <div className="flex flex-col h-full bg-gaming-950 p-6 overflow-y-auto custom-scrollbar">
-       <div className="max-w-4xl mx-auto w-full space-y-8">
+       <div className="max-w-5xl mx-auto w-full space-y-8">
            
            <div className="text-center">
                <h1 className="text-3xl font-black text-white uppercase tracking-tight mb-2">AI Chart Analyst</h1>
@@ -125,7 +141,7 @@ const ChartAnalyst: React.FC<ChartAnalystProps> = ({ onAnalysisComplete, onError
                </div>
 
                {/* Results Area */}
-               <div className="bg-gaming-900 border border-gaming-800 rounded-2xl p-6 relative overflow-hidden min-h-[400px]">
+               <div className="bg-gaming-900 border border-gaming-800 rounded-2xl p-6 relative overflow-hidden min-h-[400px] flex flex-col">
                    {!result ? (
                        <div className="absolute inset-0 flex flex-col items-center justify-center text-gaming-700">
                            {isAnalyzing ? (
@@ -138,26 +154,25 @@ const ChartAnalyst: React.FC<ChartAnalystProps> = ({ onAnalysisComplete, onError
                                <>
                                    <ImageIcon size={64} className="mb-4 opacity-20" />
                                    <p className="text-xs font-bold uppercase tracking-widest">No Analysis Data</p>
+                                   <p className="text-[10px] text-gaming-600 mt-2">Upload an image to see insights</p>
                                </>
                            )}
                        </div>
                    ) : (
-                       <div className="space-y-6 animate-fade-in relative z-10">
+                       <div className="space-y-6 animate-fade-in relative z-10 flex-1 flex flex-col">
                            <div className="flex items-center gap-2 text-gaming-accent border-b border-gaming-800 pb-4">
                                <CheckCircleIcon />
                                <span className="font-bold text-lg">Analysis Complete</span>
                            </div>
 
                            {/* Signal Badge */}
-                           {result.signal && result.confidence && (
-                               <SignalBadge signal={result.signal} confidence={result.confidence} />
-                           )}
+                           <SignalBadge signal={result.signal} confidence={result.confidence} />
 
                            {/* Market Structure Findings */}
                            {result.keyFindings && result.keyFindings.length > 0 && (
                                <div className="bg-black/40 border border-gaming-700 rounded-xl p-4">
                                    <label className="text-[10px] font-bold text-gaming-500 uppercase tracking-widest mb-3 block flex items-center gap-2">
-                                       <ScanLine size={12} className="text-gaming-accent" /> Key Findings
+                                       <ScanLine size={12} className="text-gaming-accent" /> AI Observations
                                    </label>
                                    <ul className="space-y-2">
                                        {result.keyFindings.map((finding, i) => (
@@ -171,18 +186,30 @@ const ChartAnalyst: React.FC<ChartAnalystProps> = ({ onAnalysisComplete, onError
                            )}
 
                            <div className="grid grid-cols-2 gap-4">
-                               <div className="bg-gaming-800 p-3 rounded-lg">
-                                   <div className="text-[10px] text-gaming-500 uppercase font-bold">Rec. Stop Loss</div>
-                                   <div className="text-danger font-mono font-bold text-lg">{result.stopLoss} Pips</div>
+                               <div className="bg-gaming-800 p-4 rounded-xl border border-gaming-700">
+                                   <div className="text-[10px] text-gaming-500 uppercase font-bold mb-1">Rec. Stop Loss</div>
+                                   <div className="text-danger font-mono font-black text-xl">{result.stopLoss} <span className="text-sm font-medium opacity-50">Pips</span></div>
                                </div>
-                               <div className="bg-gaming-800 p-3 rounded-lg">
-                                   <div className="text-[10px] text-gaming-500 uppercase font-bold">Rec. Take Profit</div>
-                                   <div className="text-gaming-accent font-mono font-bold text-lg">{result.takeProfit} Pips</div>
+                               <div className="bg-gaming-800 p-4 rounded-xl border border-gaming-700">
+                                   <div className="text-[10px] text-gaming-500 uppercase font-bold mb-1">Rec. Take Profit</div>
+                                   <div className="text-gaming-accent font-mono font-black text-xl">{result.takeProfit} <span className="text-sm font-medium opacity-50">Pips</span></div>
                                </div>
                            </div>
                            
-                           <div className="pt-4 border-t border-gaming-800 text-center">
-                               <p className="text-xs text-gaming-500 mb-2">Strategy parameters copied to builder.</p>
+                           {/* Description Preview */}
+                           {result.description && (
+                               <div className="bg-gaming-800/50 p-3 rounded-lg border border-gaming-700/50">
+                                   <p className="text-xs text-gray-400 line-clamp-3 italic">"{result.description}"</p>
+                               </div>
+                           )}
+
+                           <div className="mt-auto pt-6 border-t border-gaming-800">
+                               <button 
+                                onClick={handleUseStrategy}
+                                className="w-full py-3 bg-white hover:bg-gray-200 text-black font-bold rounded-xl text-sm uppercase tracking-wide transition-all shadow-lg active:scale-95"
+                               >
+                                   Use This Strategy
+                               </button>
                            </div>
                        </div>
                    )}

@@ -22,7 +22,12 @@ const NotificationSystem: React.FC<NotificationSystemProps> = ({ notifications, 
   );
 };
 
-const Toast = ({ note, onClose }: { note: Notification; onClose: () => void }) => {
+interface ToastProps {
+  note: Notification;
+  onClose: () => void;
+}
+
+const Toast: React.FC<ToastProps> = ({ note, onClose }) => {
   useEffect(() => {
     const timer = setTimeout(() => {
       onClose();

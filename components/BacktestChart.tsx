@@ -12,8 +12,8 @@ import {
   AreaChart,
   Area
 } from 'recharts';
-import { BacktestResult, Candle, TradeEvent } from '../types';
-import { TrendingUp, TrendingDown, Activity, DollarSign, Percent, ArrowUp, ArrowDown } from 'lucide-react';
+import { BacktestResult } from '../types';
+import { TrendingUp, Activity, DollarSign, Percent, ArrowUp, ArrowDown } from 'lucide-react';
 
 interface BacktestChartProps {
   result: BacktestResult;
@@ -61,12 +61,27 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 };
 
 const BacktestChart: React.FC<BacktestChartProps> = ({ result, onClose }) => {
+  // Defensive Programming: Ensure result and metrics exist
+  if (!result || !result.metrics) {
+      return (
+        <div className="flex items-center justify-center h-full text-gaming-500 text-sm">
+            No backtest data available.
+        </div>
+      );
+  }
+
   const { data, trades, metrics, equityCurve } = result;
 
+  // Safe Metric Accessors
+  const netProfit = Number(metrics.netProfit) || 0;
+  const winRate = Number(metrics.winRate) || 0;
+  const totalTrades = Number(metrics.totalTrades) || 0;
+  const profitFactor = Number(metrics.profitFactor) || 0;
+
   // Prepare chart data with trade markers
-  const chartData = data.map((candle, index) => {
-    const tradeEntry = trades.find(t => t.entryIndex === index);
-    const tradeExit = trades.find(t => t.exitIndex === index);
+  const chartData = (data || []).map((candle, index) => {
+    const tradeEntry = trades ? trades.find(t => t.entryIndex === index) : undefined;
+    const tradeExit = trades ? trades.find(t => t.exitIndex === index) : undefined;
     
     return {
       ...candle,
@@ -83,25 +98,25 @@ const BacktestChart: React.FC<BacktestChartProps> = ({ result, onClose }) => {
       <div className="h-24 bg-gaming-900 border-b border-gaming-800 px-4 flex items-center gap-4 overflow-x-auto no-scrollbar shrink-0">
          <StatCard 
            label="Net Profit" 
-           value={`$${metrics.netProfit.toFixed(2)}`} 
+           value={`$${netProfit.toFixed(2)}`} 
            icon={DollarSign} 
-           colorClass={metrics.netProfit >= 0 ? 'text-gaming-accent' : 'text-danger'} 
+           colorClass={netProfit >= 0 ? 'text-gaming-accent' : 'text-danger'} 
          />
          <StatCard 
            label="Win Rate" 
-           value={`${metrics.winRate}%`} 
+           value={`${winRate.toFixed(1)}%`} 
            icon={Percent} 
            colorClass="text-blue-400" 
          />
          <StatCard 
            label="Total Trades" 
-           value={metrics.totalTrades} 
+           value={totalTrades} 
            icon={Activity} 
            colorClass="text-purple-400" 
          />
          <StatCard 
            label="Profit Factor" 
-           value={metrics.profitFactor.toFixed(2)} 
+           value={profitFactor.toFixed(2)} 
            icon={TrendingUp} 
            colorClass="text-orange-400" 
          />
@@ -124,7 +139,7 @@ const BacktestChart: React.FC<BacktestChartProps> = ({ result, onClose }) => {
                         <Line type="monotone" dataKey="close" stroke="#3b82f6" strokeWidth={1.5} dot={false} activeDot={{ r: 4, fill: '#fff' }} />
                         
                         {/* Iterate trades to draw markers and lines */}
-                        {trades.map((trade, i) => {
+                        {trades && trades.map((trade, i) => {
                             const entryTime = data[trade.entryIndex]?.time;
                             const exitTime = data[trade.exitIndex]?.time;
                             const isWin = trade.profit > 0;
@@ -168,6 +183,7 @@ const BacktestChart: React.FC<BacktestChartProps> = ({ result, onClose }) => {
         </div>
 
         {/* Equity Curve */}
+        {equityCurve && equityCurve.length > 0 && (
         <div className="flex-1 min-h-[150px] bg-gaming-900 border border-gaming-800 rounded p-4 relative flex flex-col">
              <h3 className="absolute top-3 left-3 text-[10px] font-black text-gaming-500 z-10 uppercase tracking-widest bg-gaming-900/80 px-2 py-1 rounded">Equity Curve</h3>
              <div className="flex-1 w-full min-h-0 mt-2">
@@ -193,6 +209,7 @@ const BacktestChart: React.FC<BacktestChartProps> = ({ result, onClose }) => {
                 </ResponsiveContainer>
             </div>
         </div>
+        )}
       </div>
     </div>
   );
